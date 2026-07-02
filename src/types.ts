@@ -81,6 +81,9 @@ export interface UserAccount {
   kycCountry?: string;
   kycDocumentType?: string;
   password?: string;
+  webAuthnEnabled?: boolean;
+  webAuthnCredentialId?: string;
+  webAuthnPublicKey?: string;
 }
 
 export interface ProfitClaimRecord {

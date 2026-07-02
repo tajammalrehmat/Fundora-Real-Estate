@@ -819,7 +819,7 @@ export default function App() {
     };
 
     // Build unique Investment Record
-    const dailyProfitRate = Math.round((totalCost * ((project.expectedRoi / 100) / 365)) * 100) / 100;
+    const dailyProfitRate = Math.round((totalCost * (project.expectedRoi / 100) / ((project.durationMonths || 12) * 30)) * 100) / 100;
     const newInvestment: InvestmentRecord = {
       id: `inv-${Date.now()}`,
       userId: activeUser.id,
@@ -1092,7 +1092,8 @@ export default function App() {
     // Recalibrate active investments
     setInvestmentsList(prev => prev.map(inv => {
       if (inv.projectId === projectId) {
-        const newDailyProfit = Math.round((inv.totalCost * ((newRoi / 100) / 365)) * 100) / 100;
+        const duration = inv.durationMonths || 12;
+        const newDailyProfit = Math.round((inv.totalCost * (newRoi / 100) / (duration * 30)) * 100) / 100;
         return {
           ...inv,
           dailyProfitRate: newDailyProfit
@@ -1110,7 +1111,8 @@ export default function App() {
     // Recalibrate active investments
     setInvestmentsList(prev => prev.map(inv => {
       if (inv.projectId === updatedProj.id) {
-        const newDailyProfit = Math.round((inv.totalCost * ((updatedProj.expectedRoi / 100) / 365)) * 100) / 100;
+        const duration = inv.durationMonths || updatedProj.durationMonths || 12;
+        const newDailyProfit = Math.round((inv.totalCost * (updatedProj.expectedRoi / 100) / (duration * 30)) * 100) / 100;
         return {
           ...inv,
           projectName: updatedProj.name,
