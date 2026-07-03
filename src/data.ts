@@ -7,36 +7,6 @@ import { RealEstateProject, UserAccount, Transaction, SecurityLog } from './type
 
 export const INITIAL_PROJECTS: RealEstateProject[] = [
   {
-    id: 'proj-1',
-    name: 'Canary Wharf Heights',
-    location: 'Canary Wharf, London, UK',
-    category: 'Residential',
-    imageUrl: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80',
-    totalShares: 1500,
-    availableShares: 412,
-    pricePerShare: 113, // Matches standard example
-    expectedRoi: 16.5,
-    durationMonths: 18,
-    description: 'Canary Wharf Heights sets a new benchmark for luxury high-rise living with panoramic views of the River Thames. It features private elevators, climate-controlled infinity spas, and direct access to London\'s pre-eminent financial hub.',
-    status: 'Active',
-    documents: ['Brochure_CanaryWharf.pdf', 'UK_Land_Registry_Approval.pdf', 'NOC_London_Municipality.pdf']
-  },
-  {
-    id: 'proj-2',
-    name: 'The Bishopsgate Corporate Plaza',
-    location: 'Bishopsgate, London, UK',
-    category: 'Commercial',
-    imageUrl: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=800&q=80',
-    totalShares: 2000,
-    availableShares: 210,
-    pricePerShare: 250,
-    expectedRoi: 19.2,
-    durationMonths: 24,
-    description: 'An elite, high-visibility commercial workspace within the heart of London\'s financial district. Fully leased by tier-1 institutional and fintech companies, offering a steady and secure monthly yield.',
-    status: 'Active',
-    documents: ['Plaza_MasterPlan.pdf', 'UK_Companies_House_Consent.pdf', 'Commercial_Lease_Agreement.pdf']
-  },
-  {
     id: 'proj-3',
     name: 'Kensington Palace Gardens Suites',
     location: 'Kensington, London, UK',
@@ -52,36 +22,6 @@ export const INITIAL_PROJECTS: RealEstateProject[] = [
     documents: ['Suite_Specs_Kensington.pdf', 'UK_Building_Permit.pdf']
   },
   {
-    id: 'proj-4',
-    name: 'Manchester MediaCity Smart Living',
-    location: 'MediaCity, Manchester, UK',
-    category: 'Co-Living',
-    imageUrl: 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80',
-    totalShares: 1200,
-    availableShares: 875,
-    pricePerShare: 113,
-    expectedRoi: 15.0,
-    durationMonths: 15,
-    description: 'A modern, tech-enabled micro-housing and co-living space designed specifically for UK tech professionals and digital entrepreneurs. Featuring dual gigabit fiber connections, collaborative hubs, and low carbon energy ratings.',
-    status: 'Active',
-    documents: ['CoLiving_Investment_Memo.pdf', 'UK_Environmental_Assessment.pdf']
-  },
-  {
-    id: 'proj-5',
-    name: 'Birmingham Commercial Atrium',
-    location: 'Bullring, Birmingham, UK',
-    category: 'Commercial',
-    imageUrl: 'https://images.unsplash.com/photo-1554469384-e58fa16e2d09?auto=format&fit=crop&w=800&q=80',
-    totalShares: 800,
-    availableShares: 800, // Upcoming/Just Added
-    pricePerShare: 125,
-    expectedRoi: 17.8,
-    durationMonths: 20,
-    description: 'A state-of-the-art retail atrium featuring premium shopping units and high-footfall dining zones in the heart of Birmingham\'s vibrant commercial zone.',
-    status: 'Upcoming',
-    documents: ['Atrium_Feasibility_Study.pdf', 'UK_Development_Approval.pdf']
-  },
-  {
     id: 'proj-6',
     name: 'Emaar Downtown Boulevard Suites',
     location: 'Downtown Dubai, UAE',
@@ -95,21 +35,6 @@ export const INITIAL_PROJECTS: RealEstateProject[] = [
     description: 'Ultra-luxurious serviced apartments situated directly opposite Burj Khalifa. Managed by the Emaar hospitality group, offering premium tax-free rental yields and high-frequency capital appreciation.',
     status: 'Active',
     documents: ['Emaar_Downtown_Specs.pdf', 'Dubai_DLD_Approval.pdf', 'NOC_Emaar_Properties.pdf']
-  },
-  {
-    id: 'proj-7',
-    name: 'Dubai Marina Horizon Tower',
-    location: 'Dubai Marina, UAE',
-    category: 'Residential',
-    imageUrl: 'https://images.unsplash.com/photo-1582407947304-fd86f028f716?auto=format&fit=crop&w=800&q=80',
-    totalShares: 1400,
-    availableShares: 550,
-    pricePerShare: 150,
-    expectedRoi: 16.2,
-    durationMonths: 18,
-    description: 'Breathtaking high-rise residential complex located on the Dubai Marina waterfront. Enjoy high occupancy levels driven by expatriate business professionals and luxury holiday travelers.',
-    status: 'Active',
-    documents: ['Marina_Horizon_Brochure.pdf', 'Dubai_Land_Department_NOC.pdf']
   }
 ];
 
@@ -131,7 +56,10 @@ export const INITIAL_USER: UserAccount = {
   totalInvestment: 700.00,
   totalProfitEarned: 132.50,
   isEmailVerified: true,
-  registrationDate: '2026-04-10'
+  registrationDate: '2026-04-10',
+  webAuthnEnabled: true,
+  webAuthnCredentialId: 'demo-credential-id',
+  webAuthnPublicKey: 'demo-public-key-handshake'
 };
 
 export const INITIAL_ADMIN: UserAccount = {

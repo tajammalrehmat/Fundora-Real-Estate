@@ -10,6 +10,7 @@ import AuthPages from './components/AuthPages';
 import UserDashboard from './components/UserDashboard';
 import AdminPanel from './components/AdminPanel';
 import GlobalNavbar from './components/GlobalNavbar';
+import BiometricLockScreen from './components/BiometricLockScreen';
 import { RealEstateProject, Transaction, UserAccount, InvestmentRecord, ProfitClaimRecord, SecurityLog, SystemSettings } from './types';
 import { INITIAL_PROJECTS, INITIAL_USER, INITIAL_ADMIN, INITIAL_TRANSACTIONS, INITIAL_SECURITY_LOGS } from './data';
 import { 
@@ -82,6 +83,17 @@ export default function App() {
     }
   });
 
+  const [isAppLocked, setIsAppLocked] = useState<boolean>(() => {
+    const saved = localStorage.getItem('inv_active_user');
+    if (!saved) return false;
+    try {
+      const parsed = JSON.parse(saved);
+      return !!(parsed && parsed.webAuthnEnabled);
+    } catch (_) {
+      return false;
+    }
+  });
+
   // Robust URL Hash Routing Sync using Refs to prevent infinite loop / flickering
   const activeUserRef = useRef(activeUser);
   const currentPageRef = useRef(currentPage);
@@ -99,68 +111,71 @@ export default function App() {
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash;
-      const currentUser = activeUserRef.current;
-      const currentPg = currentPageRef.current;
-      const currentDashboardTab = activeDashboardTabRef.current;
-      const currentAdminTab = activeAdminTabRef.current;
-      const currentAuthReason = authReasonRef.current;
-      console.log('[App] handleHashChange triggered. hash:', hash, 'currentPg:', currentPg);
+      console.log('[App] handleHashChange triggered. hash:', hash);
 
-      if (!hash || hash === '#/' || hash === '#/home') {
-        if (currentPg !== 'home') setCurrentPage('home');
-      } else if (hash === '#/login' || hash.startsWith('#/login')) {
-        if (currentPg !== 'login') setCurrentPage('login');
-      } else if (hash === '#/register' || hash.startsWith('#/register')) {
-        if (currentPg !== 'register') setCurrentPage('register');
-      } else if (hash === '#/forgot' || hash.startsWith('#/forgot')) {
-        if (currentPg !== 'forgot') setCurrentPage('forgot');
-      } else if (hash.startsWith('#/dashboard')) {
-        const parts = hash.split('/');
-        const tab = parts[2] as any;
-        const validTabs = ['overview', 'properties', 'wallet', 'ledger', 'claim', 'referrals', 'profile'];
-        
-        // Authorization Guards
-        if (!currentUser) {
-          if (currentAuthReason !== 'Dashboard') setAuthReason('Dashboard');
-          if (currentPg !== 'login') setCurrentPage('login');
-          window.history.replaceState(null, '', '#/login');
-          return;
-        }
-        if (currentUser.role === 'admin') {
-          if (currentPg !== 'admin') setCurrentPage('admin');
-          return;
-        }
+      setTimeout(() => {
+        const latestUser = activeUserRef.current;
+        const latestPg = currentPageRef.current;
+        const latestDashboardTab = activeDashboardTabRef.current;
+        const latestAdminTab = activeAdminTabRef.current;
+        const latestAuthReason = authReasonRef.current;
 
-        if (currentPg !== 'dashboard') setCurrentPage('dashboard');
-        if (validTabs.includes(tab)) {
-          if (currentDashboardTab !== tab) setActiveDashboardTab(tab);
-        } else {
-          if (currentDashboardTab !== 'overview') setActiveDashboardTab('overview');
-        }
-      } else if (hash.startsWith('#/admin')) {
-        const parts = hash.split('/');
-        const tab = parts[2] as any;
-        const validTabs = ['stats', 'deposits', 'withdrawals', 'projects', 'users', 'security'];
+        if (!hash || hash === '#/' || hash === '#/home') {
+          if (latestPg !== 'home') setCurrentPage('home');
+        } else if (hash === '#/login' || hash.startsWith('#/login')) {
+          if (latestPg !== 'login') setCurrentPage('login');
+        } else if (hash === '#/register' || hash.startsWith('#/register')) {
+          if (latestPg !== 'register') setCurrentPage('register');
+        } else if (hash === '#/forgot' || hash.startsWith('#/forgot')) {
+          if (latestPg !== 'forgot') setCurrentPage('forgot');
+        } else if (hash.startsWith('#/dashboard')) {
+          const parts = hash.split('/');
+          const tab = parts[2] as any;
+          const validTabs = ['overview', 'properties', 'wallet', 'ledger', 'claim', 'referrals', 'profile'];
+          
+          // Authorization Guards
+          if (!latestUser) {
+            if (latestAuthReason !== 'Dashboard') setAuthReason('Dashboard');
+            if (latestPg !== 'login') setCurrentPage('login');
+            window.history.replaceState(null, '', '#/login');
+            return;
+          }
+          if (latestUser.role === 'admin') {
+            if (latestPg !== 'admin') setCurrentPage('admin');
+            return;
+          }
 
-        // Authorization Guards
-        if (!currentUser) {
-          if (currentAuthReason !== 'Admin Panel') setAuthReason('Admin Panel');
-          if (currentPg !== 'login') setCurrentPage('login');
-          window.history.replaceState(null, '', '#/login');
-          return;
-        }
-        if (currentUser.role !== 'admin') {
-          if (currentPg !== 'dashboard') setCurrentPage('dashboard');
-          return;
-        }
+          if (latestPg !== 'dashboard') setCurrentPage('dashboard');
+          if (validTabs.includes(tab)) {
+            if (latestDashboardTab !== tab) setActiveDashboardTab(tab);
+          } else {
+            if (latestDashboardTab !== 'overview') setActiveDashboardTab('overview');
+          }
+        } else if (hash.startsWith('#/admin')) {
+          const parts = hash.split('/');
+          const tab = parts[2] as any;
+          const validTabs = ['stats', 'deposits', 'withdrawals', 'projects', 'users', 'security'];
 
-        if (currentPg !== 'admin') setCurrentPage('admin');
-        if (validTabs.includes(tab)) {
-          if (currentAdminTab !== tab) setActiveAdminTab(tab);
-        } else {
-          if (currentAdminTab !== 'stats') setActiveAdminTab('stats');
+          // Authorization Guards
+          if (!latestUser) {
+            if (latestAuthReason !== 'Admin Panel') setAuthReason('Admin Panel');
+            if (latestPg !== 'login') setCurrentPage('login');
+            window.history.replaceState(null, '', '#/login');
+            return;
+          }
+          if (latestUser.role !== 'admin') {
+            if (latestPg !== 'dashboard') setCurrentPage('dashboard');
+            return;
+          }
+
+          if (latestPg !== 'admin') setCurrentPage('admin');
+          if (validTabs.includes(tab)) {
+            if (latestAdminTab !== tab) setActiveAdminTab(tab);
+          } else {
+            if (latestAdminTab !== 'stats') setActiveAdminTab('stats');
+          }
         }
-      }
+      }, 0);
     };
 
     // Run on mount or when key dependencies update
@@ -441,7 +456,23 @@ export default function App() {
           loadSystemSettingsFromFirebase()
         ]);
 
-        if (projects && projects.length > 0) setProjectsList(projects);
+        let filteredProjects = projects || [];
+        const originalDeletedIds = ['proj-1', 'proj-2', 'proj-4', 'proj-5', 'proj-7'];
+        const hasLegacyDeleted = filteredProjects.some(p => originalDeletedIds.includes(p.id));
+        
+        if (hasLegacyDeleted) {
+          console.log("Cleaning up legacy deleted projects from Firestore...");
+          for (const id of originalDeletedIds) {
+            await deleteProjectFromFirebase(id);
+          }
+          filteredProjects = filteredProjects.filter(p => !originalDeletedIds.includes(p.id));
+        }
+
+        if (filteredProjects && filteredProjects.length > 0) {
+          setProjectsList(filteredProjects);
+        } else {
+          setProjectsList(INITIAL_PROJECTS);
+        }
         if (users && users.length > 0) setUsersListState(users);
         if (transactions) setTransactionsList(transactions);
         if (investments) setInvestmentsList(investments);
@@ -457,8 +488,14 @@ export default function App() {
             const freshUser = users.find(u => u.id === parsed.id || u.email.toLowerCase() === parsed.email.toLowerCase());
             if (freshUser) {
               setActiveUser(freshUser);
+              if (freshUser.webAuthnEnabled) {
+                setIsAppLocked(true);
+              }
             } else {
               setActiveUser(parsed);
+              if (parsed.webAuthnEnabled) {
+                setIsAppLocked(true);
+              }
             }
           } catch (_) {
             // fallback
@@ -646,6 +683,7 @@ export default function App() {
   // Successful Session Login/Register
   const handleAuthSuccess = (userAccount: UserAccount) => {
     setActiveUser(userAccount);
+    setIsAppLocked(false);
 
     // Save/update global users list
     setUsersListState(prev => {
@@ -694,6 +732,7 @@ export default function App() {
   const handleLogout = () => {
     addSystemLog('Login_Failure', `Active session for ${activeUser?.email || 'Guest'} disconnected.`, 'Secure');
     setActiveUser(null);
+    setIsAppLocked(false);
     setCurrentPage('home');
   };
 
@@ -1422,6 +1461,17 @@ export default function App() {
     return `${dispHour}:${simulatedMinute.toString().padStart(2, '0')} ${isPm ? 'PM' : 'AM'}`;
   };
 
+  if (activeUser && isAppLocked) {
+    return (
+      <BiometricLockScreen
+        activeUser={activeUser}
+        onUnlock={() => setIsAppLocked(false)}
+        onLogout={handleLogout}
+        addSystemLog={addSystemLog}
+      />
+    );
+  }
+
   return (
     <MobileShell currentTimeString={getSimulatedTimeString()}>
       <GlobalNavbar 
@@ -1461,6 +1511,7 @@ export default function App() {
           authReason={authReason}
           onRegisterPending={handleRegisterPending}
           onPasswordReset={handleResetPassword}
+          onUpdateUser={handleUpdateAnyUser}
         />
       )}
 

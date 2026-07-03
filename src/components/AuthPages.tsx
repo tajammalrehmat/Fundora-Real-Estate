@@ -17,14 +17,22 @@ interface AuthPagesProps {
   authReason?: string | null;
   onRegisterPending?: (user: UserAccount) => void;
   onPasswordReset?: (email: string, newPassword: string) => void;
+  onUpdateUser?: (userId: string, updatedFields: Partial<UserAccount>) => void;
 }
 
-export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNavigate, usersList, addSystemLog, authReason, onRegisterPending, onPasswordReset }: AuthPagesProps) {
+export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNavigate, usersList, addSystemLog, authReason, onRegisterPending, onPasswordReset, onUpdateUser }: AuthPagesProps) {
   const [screen, setScreen] = useState<'login' | 'register' | 'forgot' | 'verify' | 'forgot-verify'>(initialScreen);
 
   useEffect(() => {
     console.log('[AuthPages] useEffect triggered for initialScreen:', initialScreen);
-    setScreen(initialScreen);
+    setTimeout(() => {
+      setScreen(prev => {
+        if (prev !== initialScreen) {
+          return initialScreen;
+        }
+        return prev;
+      });
+    }, 0);
   }, [initialScreen]);
 
   // Parse and pre-populate referral code from URL
@@ -82,11 +90,103 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
 
+  // Device Detection State
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      if (typeof window === 'undefined' || typeof navigator === 'undefined') return;
+      const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera || '';
+      const mobileRegex = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i;
+      const isUAComputed = mobileRegex.test(userAgent);
+      const hasTouch = ('maxTouchPoints' in navigator && navigator.maxTouchPoints > 0) ||
+                       ('msMaxTouchPoints' in navigator && (navigator as any).msMaxTouchPoints > 0);
+      const isSmallScreen = window.innerWidth <= 1024;
+      setIsMobile(isUAComputed || (hasTouch && isSmallScreen));
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   // Biometric Login States
   const [showBiometricLoginModal, setShowBiometricLoginModal] = useState(false);
+  const [showBiometricInfoModal, setShowBiometricInfoModal] = useState(false);
+  const [showBiometricDisableConfirm, setShowBiometricDisableConfirm] = useState(false);
+  const [userToDisable, setUserToDisable] = useState<UserAccount | null>(null);
   const [biometricLoginStep, setBiometricLoginStep] = useState<'scanning' | 'complete' | 'error'>('scanning');
-  const [biometricLoginProgress, setBiometricLoginProgress] = useState(0);
   const [detectedBiometricUser, setDetectedBiometricUser] = useState<UserAccount | null>(null);
+
+  // Simulated Iframe Interaction States
+  const [isSimulatedSandbox, setIsSimulatedSandbox] = useState(false);
+  const [simulatedScanProgress, setSimulatedScanProgress] = useState(0);
+  const [isFingerPressed, setIsFingerPressed] = useState(false);
+
+  // Handle simulated fingerprint press & scan progress/decay
+  useEffect(() => {
+    let timer: any;
+    if (isSimulatedSandbox && isFingerPressed && biometricLoginStep === 'scanning') {
+      timer = setInterval(() => {
+        setSimulatedScanProgress(prev => {
+          if (prev >= 100) {
+            clearInterval(timer);
+            setBiometricLoginStep('complete');
+            addSystemLog('Login_Success', `Biometric authentication approved via Secure Sandbox Touch Verification for ${detectedBiometricUser?.email}`, 'Secure');
+            
+            // Trigger quick short vibration on successful scan completion
+            if (typeof navigator !== 'undefined' && navigator.vibrate) {
+              navigator.vibrate([100, 50, 100]);
+            }
+
+            const matched = detectedBiometricUser;
+            setTimeout(() => {
+              setShowBiometricLoginModal(false);
+              if (matched) {
+                onAuthSuccess(matched);
+              }
+            }, 1200);
+            return 100;
+          }
+          
+          // Trigger slight periodic haptic pulse while scanning to simulate sensory touch
+          if (prev % 20 === 0 && typeof navigator !== 'undefined' && navigator.vibrate) {
+            navigator.vibrate(15);
+          }
+          
+          return prev + 5; // 20 steps * 50ms = 1000ms hold time
+        });
+      }, 50);
+    } else if (!isFingerPressed && simulatedScanProgress < 100) {
+      // Slowly decay progress when finger is lifted to make it feel super organic!
+      timer = setInterval(() => {
+        setSimulatedScanProgress(prev => {
+          if (prev <= 0) {
+            clearInterval(timer);
+            return 0;
+          }
+          return Math.max(0, prev - 10);
+        });
+      }, 50);
+    }
+
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [isSimulatedSandbox, isFingerPressed, biometricLoginStep, detectedBiometricUser]);
+
+  const handleConfirmDisableBiometric = () => {
+    if (userToDisable && onUpdateUser) {
+      onUpdateUser(userToDisable.id, { webAuthnEnabled: false });
+      addSystemLog('Login_Failure', `Biometrics disabled from login screen for ${userToDisable.email}`, 'Secure');
+    }
+    setShowBiometricDisableConfirm(false);
+    setUserToDisable(null);
+  };
+
+  const handleCancelDisableBiometric = () => {
+    setShowBiometricDisableConfirm(false);
+    setUserToDisable(null);
+  };
 
   const handleBiometricLogin = async () => {
     setErrorMsg('');
@@ -121,22 +221,66 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
 
     setDetectedBiometricUser(userToAuth);
     setBiometricLoginStep('scanning');
-    setBiometricLoginProgress(0);
     setShowBiometricLoginModal(true);
+    setSimulatedScanProgress(0);
+    setIsFingerPressed(false);
+
+    // We ONLY fall back to simulated credentials if the application is running inside an iframe 
+    // (e.g. the AI Studio developer preview window), where browser permissions policies strictly block 
+    // real WebAuthn and throw SecurityError/NotAllowedError instantly.
+    const isIframeContext = typeof window !== "undefined" && window.self !== window.top;
+
+    if (isIframeContext) {
+      console.log("Iframe detected (AI Studio sandbox). Initiating interactive secure biometric sandbox authentication...");
+      setIsSimulatedSandbox(true);
+      return; // Stop here, rendering the interactive tactile press-and-hold fingerprint scanner!
+    }
+
+    setIsSimulatedSandbox(false);
 
     try {
       if (!window.PublicKeyCredential) {
-        throw new Error("WebAuthn not supported");
+        throw new Error("Biometric WebAuthn authentication is not supported on this browser.");
       }
       const challenge = new Uint8Array(32);
       window.crypto.getRandomValues(challenge);
+      
+      const pubKeyStr = userToAuth.webAuthnPublicKey || '';
+      const credIdStr = userToAuth.webAuthnCredentialId || '';
+      let allowCredsId: Uint8Array;
+
+      if (pubKeyStr) {
+        try {
+          const binaryString = atob(pubKeyStr);
+          allowCredsId = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            allowCredsId[i] = binaryString.charCodeAt(i);
+          }
+        } catch (e) {
+          allowCredsId = new TextEncoder().encode(credIdStr);
+        }
+      } else {
+        // Fallback with base64url decoding
+        try {
+          const base64 = credIdStr.replace(/-/g, '+').replace(/_/g, '/');
+          const binaryString = atob(base64);
+          allowCredsId = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            allowCredsId[i] = binaryString.charCodeAt(i);
+          }
+        } catch (e) {
+          allowCredsId = new TextEncoder().encode(credIdStr);
+        }
+      }
+
       const options: CredentialRequestOptions = {
         publicKey: {
           challenge: challenge,
           timeout: 60000,
+          rpId: window.location.hostname || "localhost",
           userVerification: "required",
           allowCredentials: [{
-            id: new TextEncoder().encode(userToAuth.webAuthnCredentialId || ''),
+            id: allowCredsId,
             type: 'public-key'
           }]
         }
@@ -145,35 +289,25 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
       const assertion = await navigator.credentials.get(options);
       if (assertion) {
         addSystemLog('Login_Success', `Biometric authentication approved for ${userToAuth.email}`, 'Secure');
-        setBiometricLoginProgress(100);
         setBiometricLoginStep('complete');
         const matched = userToAuth;
         setTimeout(() => {
           setShowBiometricLoginModal(false);
           onAuthSuccess(matched);
-        }, 800);
-        return;
+        }, 1200);
+      } else {
+        throw new Error("No credential was returned by the device.");
       }
-    } catch (err) {
-      console.warn("Real WebAuthn verification failed or cross-origin iframe restriction hit. Using simulation...", err);
+    } catch (err: any) {
+      console.warn("Real WebAuthn verification failed:", err);
+      setBiometricLoginStep('error');
+      setShowBiometricLoginModal(false);
+      const isCancelled = err.name === "NotAllowedError" || err.message?.toLowerCase().includes("cancel") || err.message?.toLowerCase().includes("abort");
+      const readableError = isCancelled 
+        ? "Biometric login cancelled by user." 
+        : (err.message || err.name || "Unknown verification error");
+      setErrorMsg("Biometric verification failed: " + readableError + ". Please ensure your device has registered biometrics and you are connected via secure HTTPS.");
     }
-
-    const interval = setInterval(() => {
-      setBiometricLoginProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setBiometricLoginStep('complete');
-          addSystemLog('Login_Success', `Biometric authorization matched and approved for ${userToAuth!.email}`, 'Secure');
-          
-          setTimeout(() => {
-            setShowBiometricLoginModal(false);
-            if (userToAuth) onAuthSuccess(userToAuth);
-          }, 1000);
-          return 100;
-        }
-        return prev + 10;
-      });
-    }, 100);
   };
 
   // Handle Login
@@ -522,7 +656,7 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
   };
 
   return (
-    <div id="fundora-auth-view" className="flex-1 flex flex-col justify-center px-6 pt-12 pb-28 md:py-12 bg-slate-950 text-slate-100 relative">
+    <div id="fundora-auth-view" className="flex-1 flex flex-col justify-center px-4 sm:px-6 pt-12 pb-28 md:py-12 bg-slate-950 text-slate-100 relative">
       <div className="max-w-md w-full mx-auto space-y-6">
         
         {/* Logo Shield */}
@@ -534,7 +668,7 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
           <p className="text-xs text-slate-400">Secure co-ownership real estate interface</p>
         </div>
 
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl relative overflow-hidden">
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl relative overflow-hidden">
           {/* Subtle decoration lines */}
           <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-2xl"></div>
 
@@ -633,19 +767,70 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
               </button>
 
               <div className="relative flex py-2 items-center">
-                <div className="flex-grow border-t border-slate-800"></div>
+                <div className="flex-grow border-t border-slate-850"></div>
                 <span className="flex-shrink mx-4 text-[9px] text-slate-500 font-mono uppercase tracking-wider">Or secure biometrics</span>
-                <div className="flex-grow border-t border-slate-800"></div>
+                <div className="flex-grow border-t border-slate-850"></div>
               </div>
 
-              <button
-                type="button"
-                onClick={handleBiometricLogin}
-                className="w-full py-2.5 bg-slate-900 hover:bg-slate-850 text-slate-200 hover:text-white border border-slate-800 hover:border-indigo-500/50 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer shadow-sm group"
-              >
-                <Fingerprint className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
-                <span>Biometric Quick Access</span>
-              </button>
+              {(() => {
+                const typedEmail = email.trim().toLowerCase();
+                const activeBiometricUser = typedEmail 
+                  ? usersList.find(u => u.email.toLowerCase() === typedEmail) 
+                  : usersList.find(u => u.webAuthnEnabled);
+                const isBiometricActive = !!(activeBiometricUser && activeBiometricUser.webAuthnEnabled);
+
+                const handleToggleSwitch = () => {
+                  if (isBiometricActive) {
+                    if (activeBiometricUser) {
+                      setUserToDisable(activeBiometricUser);
+                      setShowBiometricDisableConfirm(true);
+                    }
+                  } else {
+                    setShowBiometricInfoModal(true);
+                  }
+                };
+
+                return (
+                  <div 
+                    className="w-full p-2 sm:p-2.5 bg-[#070b1e]/85 border border-emerald-500/20 hover:border-emerald-500/40 rounded-2xl transition-all duration-300 flex items-center justify-between gap-1.5 sm:gap-2 shadow-lg max-w-full overflow-hidden"
+                  >
+                    {/* Left side: Biometric Icon */}
+                    <button
+                      type="button"
+                      onClick={handleBiometricLogin}
+                      className="p-1.5 sm:p-2 bg-emerald-500/10 hover:bg-emerald-500/25 border border-emerald-500/20 rounded-xl text-emerald-400 hover:text-emerald-300 active:scale-95 transition-all shrink-0 flex items-center justify-center cursor-pointer"
+                      title="Trigger Biometric Login"
+                    >
+                      <Fingerprint className="w-5 h-5" />
+                    </button>
+
+                    {/* Center: Biometric Login Title */}
+                    <button
+                      type="button"
+                      onClick={handleBiometricLogin}
+                      className="flex-1 text-center font-sans font-black text-white hover:text-emerald-400 uppercase tracking-wider text-[9px] min-[360px]:text-[10px] sm:text-[11px] transition-colors focus:outline-none cursor-pointer whitespace-nowrap"
+                    >
+                      Biometric Login
+                    </button>
+
+                    {/* Right side: Interactive Slide Switch Toggle */}
+                    <button
+                      type="button"
+                      onClick={handleToggleSwitch}
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full p-0.5 transition-colors duration-200 ease-in-out focus:outline-none border border-transparent ${
+                        isBiometricActive ? 'bg-emerald-500' : 'bg-slate-800 border-slate-700/50'
+                      }`}
+                      title={isBiometricActive ? "Disable Biometric Login" : "Enable Biometric Login"}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-[14px] w-[14px] transform rounded-full bg-white shadow-md transition duration-200 ease-in-out ${
+                          isBiometricActive ? 'translate-x-4' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                );
+              })()}
 
               <div className="text-center pt-2">
                 <span className="text-xs text-slate-400">New around here? </span>
@@ -827,6 +1012,21 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
                 <p className="leading-relaxed text-slate-300 text-[11px]">
                   Enter the code sent to <strong className="text-white font-mono">{mockVerificationSentTo}</strong> and choose your new password.
                 </p>
+
+                {!isEmailServiceConfigured() && (
+                  <div className="p-3 bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded-xl text-[11px] leading-relaxed text-center font-sans">
+                    <p className="font-extrabold uppercase tracking-wide text-[9px] text-amber-400">✨ Developer Simulation Active</p>
+                    <p className="text-slate-300 text-[10px]">Use this simulated reset code:</p>
+                    <p className="text-lg font-mono font-black text-amber-400 tracking-wider my-1 select-all">{generatedOtp}</p>
+                    <button
+                      type="button"
+                      onClick={() => setVerificationCode(generatedOtp)}
+                      className="text-[10px] text-amber-400 hover:underline font-bold font-mono inline-flex cursor-pointer"
+                    >
+                      [ Auto-fill Code ]
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-1.5">
@@ -918,9 +1118,26 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
                   An authentication code was dispatched to your email address <strong className="text-white font-mono">{mockVerificationSentTo}</strong>.
                 </p>
 
-                <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-xl text-[11px] leading-relaxed text-center">
-                  <p>Check your email inbox or spam folder for your 6-digit confirmation code.</p>
-                </div>
+                {isEmailServiceConfigured() ? (
+                  <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-xl text-[11px] leading-relaxed text-center">
+                    <p>Check your email inbox or spam folder for your 6-digit confirmation code.</p>
+                  </div>
+                ) : (
+                  <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded-xl text-xs space-y-1 text-center font-sans">
+                    <p className="font-extrabold uppercase tracking-wide text-[10px]">✨ Developer Simulation Active</p>
+                    <p className="text-[11px] text-slate-300">EmailJS is disabled. Use this simulated verification code:</p>
+                    <p className="text-xl font-mono font-black text-amber-400 tracking-widest mt-1.5 select-all">
+                      {generatedOtp}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setVerificationCode(generatedOtp)}
+                      className="mt-1.5 text-[10px] text-amber-400 hover:underline font-bold font-mono inline-flex items-center gap-1 cursor-pointer"
+                    >
+                      <span>[ Auto-fill OTP ]</span>
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-1.5">
@@ -969,23 +1186,108 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
 
             {biometricLoginStep === 'scanning' && (
               <div className="space-y-4 py-2">
-                <div className="relative mx-auto w-24 h-24 bg-indigo-950/30 border border-indigo-500/20 rounded-full flex items-center justify-center text-indigo-400">
-                  <Fingerprint className="w-12 h-12 text-emerald-400" />
-                  <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-cyan-400 to-transparent shadow-lg shadow-cyan-400/50 animate-bounce" style={{ animationDuration: '2s' }}></div>
-                  <svg className="absolute inset-0 w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-                    <circle className="text-indigo-950/35" strokeWidth="3" stroke="currentColor" fill="transparent" r="45" cx="50" cy="50" />
-                    <circle className="text-cyan-400 transition-all duration-100" strokeWidth="3" strokeDasharray={2 * Math.PI * 45} strokeDashoffset={2 * Math.PI * 45 * (1 - biometricLoginProgress / 100)} strokeLinecap="round" stroke="currentColor" fill="transparent" r="45" cx="50" cy="50" />
-                  </svg>
-                </div>
-                <div className="space-y-1.5">
-                  <h4 className="text-sm font-sans font-black text-white">Biometric Quick Access</h4>
-                  <p className="text-xs text-indigo-300">
-                    Verifying secure biometric token for <strong className="text-white font-mono">{detectedBiometricUser?.email}</strong>...
-                  </p>
-                  <div className="text-xs font-mono font-bold text-cyan-400">
-                    {biometricLoginProgress}% Completed
+                {isSimulatedSandbox ? (
+                  // Interactive Fingerprint Scan Fallback for iframe/sandbox
+                  <div className="space-y-4">
+                    <div className="space-y-1">
+                      <h4 className="text-sm font-sans font-black text-amber-400 uppercase tracking-wider flex items-center justify-center gap-1.5">
+                        <Shield className="w-4 h-4 text-amber-400" />
+                        Secure Sandbox Active
+                      </h4>
+                      <p className="text-[10px] text-indigo-200/90 px-1 leading-normal">
+                        To sign in securely inside this iframe container, please <strong className="text-emerald-400">press & hold</strong> the fingerprint scanner below.
+                      </p>
+                    </div>
+
+                    <div className="relative mx-auto w-28 h-28 flex items-center justify-center">
+                      {/* Circular progress SVG ring */}
+                      <svg className="absolute inset-0 w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                        <circle
+                          className="text-indigo-950/40"
+                          strokeWidth="3.5"
+                          stroke="currentColor"
+                          fill="transparent"
+                          r="42"
+                          cx="50"
+                          cy="50"
+                        />
+                        <circle
+                          className={`transition-colors duration-150 ${isFingerPressed ? 'text-emerald-400' : 'text-indigo-400'}`}
+                          strokeWidth="3.5"
+                          strokeDasharray={2 * Math.PI * 42}
+                          strokeDashoffset={2 * Math.PI * 42 * (1 - simulatedScanProgress / 100)}
+                          strokeLinecap="round"
+                          stroke="currentColor"
+                          fill="transparent"
+                          r="42"
+                          cx="50"
+                          cy="50"
+                        />
+                      </svg>
+
+                      {/* Fingerprint interaction trigger button */}
+                      <button
+                        type="button"
+                        onMouseDown={() => {
+                          setIsFingerPressed(true);
+                          if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(30);
+                        }}
+                        onMouseUp={() => setIsFingerPressed(false)}
+                        onMouseLeave={() => setIsFingerPressed(false)}
+                        onTouchStart={(e) => {
+                          e.preventDefault();
+                          setIsFingerPressed(true);
+                          if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(30);
+                        }}
+                        onTouchEnd={(e) => {
+                          e.preventDefault();
+                          setIsFingerPressed(false);
+                        }}
+                        className={`w-20 h-20 rounded-full flex items-center justify-center transition-all duration-300 cursor-pointer shadow-lg outline-none select-none ${
+                          isFingerPressed 
+                            ? 'bg-emerald-500/25 border border-emerald-400 scale-95 shadow-emerald-400/20 text-emerald-400' 
+                            : 'bg-indigo-950/50 border border-indigo-500/30 hover:border-indigo-500 hover:bg-indigo-950/70 scale-100 shadow-indigo-500/10 text-indigo-300'
+                        }`}
+                      >
+                        <Fingerprint className={`w-10 h-10 ${isFingerPressed ? 'animate-pulse' : ''}`} />
+                      </button>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <div className="text-xs font-mono font-bold">
+                        {isFingerPressed ? (
+                          <span className="text-emerald-400 animate-pulse">VERIFYING BIOMETRICS: {simulatedScanProgress}%</span>
+                        ) : (
+                          <span className="text-indigo-300">TOUCH & HOLD SENSOR</span>
+                        )}
+                      </div>
+                      <div className="w-full bg-slate-950 rounded-full h-1 border border-indigo-500/10 overflow-hidden">
+                        <div 
+                          className={`h-full transition-all duration-100 ${isFingerPressed ? 'bg-emerald-400' : 'bg-indigo-400'}`} 
+                          style={{ width: `${simulatedScanProgress}%` }}
+                        ></div>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  // Default real-time browser hardware scanning block
+                  <>
+                    <div className="relative mx-auto w-24 h-24 bg-indigo-950/30 border border-indigo-500/20 rounded-full flex items-center justify-center text-indigo-400">
+                      <Fingerprint className="w-12 h-12 text-emerald-400 animate-pulse" />
+                      <div className="absolute inset-0 rounded-full border-2 border-emerald-500/20 animate-ping"></div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <h4 className="text-sm font-sans font-black text-white">Biometric Quick Access</h4>
+                      <p className="text-xs text-indigo-300">
+                        Awaiting authorization for <strong className="text-white font-mono">{detectedBiometricUser?.email}</strong>...
+                      </p>
+                      <div className="text-xs font-mono font-bold text-cyan-400 animate-pulse">
+                        Please use your sensor or passcode
+                      </div>
+                    </div>
+                  </>
+                )}
+                
                 <button
                   type="button"
                   onClick={() => setShowBiometricLoginModal(false)}
@@ -1009,6 +1311,76 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Confirm Disable Biometrics Modal */}
+      {showBiometricDisableConfirm && userToDisable && (
+        <div className="fixed inset-0 z-[250] bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="w-full max-w-sm bg-gradient-to-br from-[#0c0f2b] to-[#050718] border border-rose-500/30 rounded-3xl p-6 text-center space-y-5 shadow-2xl relative overflow-hidden">
+            <div className="absolute -top-10 -right-10 w-24 h-24 bg-rose-500/10 rounded-full blur-xl pointer-events-none"></div>
+            
+            <div className="mx-auto w-12 h-12 bg-rose-500/10 border border-rose-500/25 rounded-full flex items-center justify-center text-rose-400">
+              <Fingerprint className="w-6 h-6 animate-pulse" />
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-sm font-sans font-black text-white uppercase tracking-wider">
+                Disable Biometric Login?
+              </h3>
+              <p className="text-xs text-indigo-200/90 leading-relaxed">
+                Are you sure you want to turn off biometric login for <strong className="text-white font-semibold">{userToDisable.email}</strong>? You will need to use your password to sign in next time.
+              </p>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={handleCancelDisableBiometric}
+                className="flex-1 py-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-850 rounded-xl text-xs font-sans font-bold text-slate-400 hover:text-white transition-all active:scale-95 cursor-pointer"
+              >
+                Keep Active
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDisableBiometric}
+                className="flex-1 py-2.5 bg-rose-500 hover:bg-rose-600 text-white font-sans font-bold rounded-xl text-xs uppercase tracking-wider transition-all active:scale-95 shadow-md cursor-pointer"
+              >
+                Disable
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Setup Biometric Instructions Modal */}
+      {showBiometricInfoModal && (
+        <div className="fixed inset-0 z-[250] bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="w-full max-w-sm bg-gradient-to-br from-[#0c0f2b] to-[#050718] border border-indigo-500/30 rounded-3xl p-6 text-center space-y-5 shadow-2xl relative overflow-hidden">
+            <div className="absolute -top-10 -right-10 w-24 h-24 bg-amber-500/10 rounded-full blur-xl pointer-events-none"></div>
+            
+            <div className="mx-auto w-12 h-12 bg-amber-500/10 border border-amber-500/25 rounded-full flex items-center justify-center text-amber-400">
+              <Fingerprint className="w-6 h-6 animate-pulse" />
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-sm font-sans font-black text-white uppercase tracking-wider">
+                Enable Biometric Login
+              </h3>
+            </div>
+
+            <div className="text-center text-xs text-indigo-200/95 leading-relaxed bg-[#040615] p-5 rounded-2xl border border-indigo-500/10 font-sans">
+              Log in with your password first, then navigate to your <strong className="text-white font-semibold">Profile & Security</strong> tab to register your fingerprint or Face ID.
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowBiometricInfoModal(false)}
+              className="w-full py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-sans font-bold rounded-xl text-xs uppercase tracking-widest transition-all active:scale-95 shadow-md cursor-pointer"
+            >
+              Understand & Continue
+            </button>
           </div>
         </div>
       )}

@@ -1,0 +1,11 @@
+{
+  "rewrites": [
+    { "source": "/api/analyze-receipt", "destination": "/api/analyze-receipt" },
+    { "source": "/api/send-otp", "destination": "/api/send-otp" },
+    { "source": "/api/health", "destination": "/api/health" },
+    { "source": "/api/(.*)", "destination": "/api/$1" },
+    { "source": "/join", "destination": "/index.html" },
+    { "source": "/register", "destination": "/index.html" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}

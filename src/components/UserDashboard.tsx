@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 import { RealEstateProject, Transaction, UserAccount, InvestmentRecord, ProfitClaimRecord, getAvatarBgClass, getInvestorTier, SystemSettings } from '../types';
 import { generateReceiptPDF, generateDocumentPDF } from '../utils/pdfReceipt';
@@ -286,29 +286,74 @@ export default function UserDashboard({
   const [isKycDragging, setIsKycDragging] = useState(false);
   const [kycStatus, setKycStatus] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
+  // Device Detection State
+  const [isMobile, setIsMobile] = useState(false);
+
   // WebAuthn Biometrics States
   const [showBiometricRegisterModal, setShowBiometricRegisterModal] = useState(false);
   const [biometricRegisterStep, setBiometricRegisterStep] = useState<'intro' | 'scanning' | 'complete'>('intro');
   const [biometricProgress, setBiometricProgress] = useState(0);
+  const [isFingerPressedRegister, setIsFingerPressedRegister] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      if (typeof window === 'undefined' || typeof navigator === 'undefined') return;
+      const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera || '';
+      const mobileRegex = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i;
+      const isUAComputed = mobileRegex.test(userAgent);
+      const hasTouch = ('maxTouchPoints' in navigator && navigator.maxTouchPoints > 0) ||
+                       ('msMaxTouchPoints' in navigator && (navigator as any).msMaxTouchPoints > 0);
+      const isSmallScreen = window.innerWidth <= 1024;
+      setIsMobile(isUAComputed || (hasTouch && isSmallScreen));
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Handle tactile register progress on fingerprint press and hold
+  useEffect(() => {
+    let timer: any;
+    if (showBiometricRegisterModal && biometricRegisterStep === 'scanning' && isFingerPressedRegister) {
+      timer = setInterval(() => {
+        setBiometricProgress(prev => {
+          if (prev >= 100) {
+            clearInterval(timer);
+            setBiometricRegisterStep('complete');
+            onUpdateUser({
+              webAuthnEnabled: true,
+              webAuthnCredentialId: 'simulated-credential-' + Math.random().toString(36).substring(2, 11),
+              webAuthnPublicKey: 'simulated-pubkey-' + Math.random().toString(36).substring(2, 11)
+            });
+            return 100;
+          }
+          if (prev % 20 === 0 && typeof navigator !== 'undefined' && navigator.vibrate) {
+            navigator.vibrate(15);
+          }
+          return prev + 5; // Ticks up by 5% every 50ms (takes 1.0s)
+        });
+      }, 50);
+    } else if (showBiometricRegisterModal && biometricRegisterStep === 'scanning' && !isFingerPressedRegister && biometricProgress < 100) {
+      timer = setInterval(() => {
+        setBiometricProgress(prev => {
+          if (prev <= 0) {
+            clearInterval(timer);
+            return 0;
+          }
+          return Math.max(0, prev - 10);
+        });
+      }, 50);
+    }
+
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [showBiometricRegisterModal, biometricRegisterStep, isFingerPressedRegister, biometricProgress]);
 
   const startBiometricScan = () => {
     setBiometricRegisterStep('scanning');
     setBiometricProgress(0);
-    const interval = setInterval(() => {
-      setBiometricProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setBiometricRegisterStep('complete');
-          onUpdateUser({
-            webAuthnEnabled: true,
-            webAuthnCredentialId: 'simulated-credential-' + Math.random().toString(36).substring(2, 11),
-            webAuthnPublicKey: 'simulated-pubkey-' + Math.random().toString(36).substring(2, 11)
-          });
-          return 100;
-        }
-        return prev + 5;
-      });
-    }, 100);
+    setIsFingerPressedRegister(false);
   };
 
   const handleRegisterBiometrics = async () => {
@@ -346,6 +391,9 @@ export default function UserDashboard({
           attestation: "none"
         }
       };
+      
+      showStatus("Please complete your mobile biometric verification... (check for your device prompt)", "info");
+      
       const credential = await navigator.credentials.create(options) as PublicKeyCredential | null;
       if (credential) {
         const rawId = btoa(String.fromCharCode(...new Uint8Array(credential.rawId)));
@@ -357,10 +405,25 @@ export default function UserDashboard({
         showStatus("Biometric signature registered successfully! You can now use Quick Access to login.", "success");
       }
     } catch (err: any) {
-      console.warn("Real WebAuthn failed or not supported in this frame. Falling back to simulated secure biometric handshake...", err);
-      setBiometricRegisterStep('intro');
-      setBiometricProgress(0);
-      setShowBiometricRegisterModal(true);
+      console.warn("Real WebAuthn registration failed, checking for simulation fallback...", err);
+      
+      // We ONLY fall back to simulated registration if the application is running inside an iframe
+      // (e.g. the AI Studio developer preview window), where browser permissions policies strictly block 
+      // real WebAuthn and throw SecurityError/NotAllowedError instantly.
+      const isIframeContext = typeof window !== "undefined" && window.self !== window.top;
+
+      if (isIframeContext) {
+        showStatus("Redirecting to secure biometric simulator due to iframe browser policy restrictions...", "info");
+        setBiometricRegisterStep('intro');
+        setBiometricProgress(0);
+        setShowBiometricRegisterModal(true);
+      } else {
+        const isCancelled = err.name === "NotAllowedError" || err.message?.toLowerCase().includes("cancel") || err.message?.toLowerCase().includes("abort");
+        const readableError = isCancelled 
+          ? "Biometric registration was cancelled by the user." 
+          : (err.message || err.name || "Unknown error");
+        showStatus("Biometric registration failed: " + readableError + ". Please ensure your browser supports WebAuthn, HTTPS is active, and you have configured a fingerprint/face sensor.", "error");
+      }
     }
   };
 
@@ -4234,70 +4297,72 @@ export default function UserDashboard({
             </div>
 
             {/* Quick Access & Biometric Authentication (WebAuthn) Module */}
-            <div className="bg-[#0e112d] border border-indigo-500/40 rounded-[1.25rem] p-5 shadow-xl text-white space-y-4">
-              <div className="flex items-center space-x-2.5 pb-2 border-b border-indigo-500/20">
-                <div className="p-2 bg-indigo-500/10 rounded-xl text-indigo-400 shrink-0 border border-indigo-500/20">
-                  <Fingerprint className="w-5 h-5" />
-                </div>
-                <div>
-                  <h4 className="text-sm font-sans font-bold text-white">Quick Access (Biometric Login)</h4>
-                  <span className="text-[10px] text-indigo-200/90 font-mono">Use your device's secure fingerprint sensor or Face ID to quickly authenticate without typing passwords.</span>
-                </div>
-              </div>
-
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-[#060819] border border-indigo-500/20 rounded-2xl gap-4">
-                <div className="space-y-1">
-                  <span className="text-xs font-black text-white flex items-center gap-1.5">
-                    Biometric Authentication (WebAuthn API)
-                    {activeUser.webAuthnEnabled ? (
-                      <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[8.5px] uppercase font-mono tracking-wider font-extrabold">Enabled</span>
-                    ) : (
-                      <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 text-[8.5px] uppercase font-mono tracking-wider font-extrabold">Disabled</span>
-                    )}
-                  </span>
-                  <p className="text-[11px] text-indigo-300 leading-normal max-w-md">
-                    Store a cryptographic public key in your device's Secure Enclave. Biometric operations are fully client-side and secure.
-                  </p>
+            {isMobile && (
+              <div className="bg-[#0e112d] border border-indigo-500/40 rounded-[1.25rem] p-5 shadow-xl text-white space-y-4">
+                <div className="flex items-center space-x-2.5 pb-2 border-b border-indigo-500/20">
+                  <div className="p-2 bg-indigo-500/10 rounded-xl text-indigo-400 shrink-0 border border-indigo-500/20">
+                    <Fingerprint className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-sans font-bold text-white">Quick Access (Biometric Login)</h4>
+                    <span className="text-[10px] text-indigo-200/90 font-mono">Use your device's secure fingerprint sensor or Face ID to quickly authenticate without typing passwords.</span>
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-3 self-start sm:self-auto">
-                  <span className="text-[10px] text-indigo-300 font-mono font-bold hidden sm:inline">
-                    {activeUser.webAuthnEnabled ? 'Turn Off' : 'Turn On'}
-                  </span>
-                  <button
-                    onClick={() => {
-                      if (activeUser.webAuthnEnabled) {
-                        handleDisableBiometrics();
-                      } else {
-                        handleRegisterBiometrics();
-                      }
-                    }}
-                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500/20 ${
-                      activeUser.webAuthnEnabled ? 'bg-emerald-500' : 'bg-slate-800'
-                    }`}
-                  >
-                    <span
-                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
-                        activeUser.webAuthnEnabled ? 'translate-x-5' : 'translate-x-0'
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-[#060819] border border-indigo-500/20 rounded-2xl gap-4">
+                  <div className="space-y-1">
+                    <span className="text-xs font-black text-white flex items-center gap-1.5">
+                      Biometric Authentication (WebAuthn API)
+                      {activeUser.webAuthnEnabled ? (
+                        <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[8.5px] uppercase font-mono tracking-wider font-extrabold">Enabled</span>
+                      ) : (
+                        <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 text-[8.5px] uppercase font-mono tracking-wider font-extrabold">Disabled</span>
+                      )}
+                    </span>
+                    <p className="text-[11px] text-indigo-300 leading-normal max-w-md">
+                      Store a cryptographic public key in your device's Secure Enclave. Biometric operations are fully client-side and secure.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-3 self-start sm:self-auto">
+                    <span className="text-[10px] text-indigo-300 font-mono font-bold hidden sm:inline">
+                      {activeUser.webAuthnEnabled ? 'Turn Off' : 'Turn On'}
+                    </span>
+                    <button
+                      onClick={() => {
+                        if (activeUser.webAuthnEnabled) {
+                          handleDisableBiometrics();
+                        } else {
+                          handleRegisterBiometrics();
+                        }
+                      }}
+                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500/20 ${
+                        activeUser.webAuthnEnabled ? 'bg-emerald-500' : 'bg-slate-800'
                       }`}
-                    />
-                  </button>
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                          activeUser.webAuthnEnabled ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
                 </div>
-              </div>
 
-              {activeUser.webAuthnEnabled && (
-                <div className="p-3 bg-[#060819] border border-indigo-500/15 rounded-xl space-y-1 text-[10px] font-mono">
-                  <div className="flex justify-between text-indigo-300">
-                    <span>Credential Identifier:</span>
-                    <span className="text-white font-bold truncate max-w-[200px]">{activeUser.webAuthnCredentialId}</span>
+                {activeUser.webAuthnEnabled && (
+                  <div className="p-3 bg-[#060819] border border-indigo-500/15 rounded-xl space-y-1 text-[10px] font-mono">
+                    <div className="flex justify-between text-indigo-300">
+                      <span>Credential Identifier:</span>
+                      <span className="text-white font-bold truncate max-w-[200px]">{activeUser.webAuthnCredentialId}</span>
+                    </div>
+                    <div className="flex justify-between text-indigo-300">
+                      <span>Biometric Public Key:</span>
+                      <span className="text-white font-bold truncate max-w-[200px]">{activeUser.webAuthnPublicKey}</span>
+                    </div>
                   </div>
-                  <div className="flex justify-between text-indigo-300">
-                    <span>Biometric Public Key:</span>
-                    <span className="text-white font-bold truncate max-w-[200px]">{activeUser.webAuthnPublicKey}</span>
-                  </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
 
           </div>
         )}
@@ -4339,47 +4404,93 @@ export default function UserDashboard({
 
             {biometricRegisterStep === 'scanning' && (
               <div className="space-y-4 py-2">
-                <div className="relative mx-auto w-24 h-24 bg-indigo-950/30 border border-indigo-500/20 rounded-full flex items-center justify-center text-indigo-400">
-                  {/* Fingerprint icon in center */}
-                  <Fingerprint className="w-12 h-12" />
-                  
-                  {/* Moving scanning line */}
-                  <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-cyan-400 to-transparent shadow-lg shadow-cyan-400/50 animate-bounce" style={{ animationDuration: '2s' }}></div>
-                  
-                  {/* Simulated circular progress ring */}
+                <div className="text-center space-y-1">
+                  <h4 className="text-xs font-sans font-black text-emerald-400 uppercase tracking-wider flex items-center justify-center gap-1.5">
+                    <Shield className="w-4 h-4 text-emerald-400 animate-pulse" />
+                    Biometric Sandbox Recorder
+                  </h4>
+                  <p className="text-[10px] text-indigo-200/90 px-1 leading-normal">
+                    Please <strong className="text-emerald-400">press & hold</strong> the fingerprint scanner below to record your device biometric footprint.
+                  </p>
+                </div>
+
+                <div className="relative mx-auto w-28 h-28 flex items-center justify-center">
+                  {/* Circular progress SVG ring */}
                   <svg className="absolute inset-0 w-full h-full transform -rotate-90" viewBox="0 0 100 100">
                     <circle
-                      className="text-indigo-950/30"
-                      strokeWidth="3"
+                      className="text-indigo-950/40"
+                      strokeWidth="3.5"
                       stroke="currentColor"
                       fill="transparent"
-                      r="45"
+                      r="42"
                       cx="50"
                       cy="50"
                     />
                     <circle
-                      className="text-cyan-400 transition-all duration-100"
-                      strokeWidth="3"
-                      strokeDasharray={2 * Math.PI * 45}
-                      strokeDashoffset={2 * Math.PI * 45 * (1 - biometricProgress / 100)}
+                      className={`transition-colors duration-150 ${isFingerPressedRegister ? 'text-emerald-400' : 'text-indigo-400'}`}
+                      strokeWidth="3.5"
+                      strokeDasharray={2 * Math.PI * 42}
+                      strokeDashoffset={2 * Math.PI * 42 * (1 - biometricProgress / 100)}
                       strokeLinecap="round"
                       stroke="currentColor"
                       fill="transparent"
-                      r="45"
+                      r="42"
                       cx="50"
                       cy="50"
                     />
                   </svg>
+
+                  {/* Fingerprint interaction trigger button */}
+                  <button
+                    type="button"
+                    onMouseDown={() => {
+                      setIsFingerPressedRegister(true);
+                      if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(30);
+                    }}
+                    onMouseUp={() => setIsFingerPressedRegister(false)}
+                    onMouseLeave={() => setIsFingerPressedRegister(false)}
+                    onTouchStart={(e) => {
+                      e.preventDefault();
+                      setIsFingerPressedRegister(true);
+                      if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(30);
+                    }}
+                    onTouchEnd={(e) => {
+                      e.preventDefault();
+                      setIsFingerPressedRegister(false);
+                    }}
+                    className={`w-20 h-20 rounded-full flex items-center justify-center transition-all duration-300 cursor-pointer shadow-lg outline-none select-none ${
+                      isFingerPressedRegister 
+                        ? 'bg-emerald-500/25 border border-emerald-400 scale-95 shadow-emerald-400/20 text-emerald-400' 
+                        : 'bg-indigo-950/50 border border-indigo-500/30 hover:border-indigo-500 hover:bg-indigo-950/70 scale-100 shadow-indigo-500/10 text-indigo-300'
+                    }`}
+                  >
+                    <Fingerprint className={`w-10 h-10 ${isFingerPressedRegister ? 'animate-pulse' : ''}`} />
+                  </button>
                 </div>
+
                 <div className="space-y-1.5">
-                  <h4 className="text-sm font-sans font-black text-white">Scanning Touch ID / Face ID...</h4>
-                  <p className="text-xs text-indigo-300 font-mono">
-                    Touch your fingerprint sensor or face your camera.
-                  </p>
-                  <div className="text-xs font-mono font-bold text-cyan-400">
-                    {biometricProgress}% Completed
+                  <div className="text-xs font-mono font-bold">
+                    {isFingerPressedRegister ? (
+                      <span className="text-emerald-400 animate-pulse">RECORDING BIOMETRICS: {biometricProgress}%</span>
+                    ) : (
+                      <span className="text-indigo-300">TOUCH & HOLD SENSOR</span>
+                    )}
+                  </div>
+                  <div className="w-full bg-slate-950 rounded-full h-1 border border-indigo-500/10 overflow-hidden animate-none">
+                    <div 
+                      className={`h-full transition-all duration-100 ${isFingerPressedRegister ? 'bg-emerald-400' : 'bg-indigo-400'}`} 
+                      style={{ width: `${biometricProgress}%` }}
+                    ></div>
                   </div>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowBiometricRegisterModal(false)}
+                  className="w-full py-2 border border-indigo-500/25 hover:bg-indigo-500/10 rounded-xl text-xs font-bold text-indigo-300 uppercase tracking-wider transition-all"
+                >
+                  Cancel
+                </button>
               </div>
             )}
 
@@ -4407,7 +4518,7 @@ export default function UserDashboard({
           </div>
         </div>
       )}
-        
+
       {/* Quick Actions overlay/modal */}
       {quickActionsOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
