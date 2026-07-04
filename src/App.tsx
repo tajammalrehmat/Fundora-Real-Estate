@@ -213,8 +213,13 @@ export default function App() {
 
     console.log('[App] hash update useEffect currentPage:', currentPage, 'currentHash:', window.location.hash, 'newHash:', newHash);
     if (window.location.hash !== newHash) {
-      console.log('[App] Replacing history hash with:', newHash);
-      window.history.replaceState(null, '', newHash);
+      if (!window.location.hash || window.location.hash === '#/') {
+        console.log('[App] Replacing history hash with:', newHash);
+        window.history.replaceState(null, '', newHash);
+      } else {
+        console.log('[App] Pushing history hash with:', newHash);
+        window.history.pushState(null, '', newHash);
+      }
     }
   }, [currentPage, activeDashboardTab, activeAdminTab]);
 
@@ -1498,6 +1503,8 @@ export default function App() {
           activeUser={activeUser}
           allTransactions={transactionsList}
           allClaims={claimsHistory}
+          projects={projectsList}
+          allUsers={usersListState}
         />
       )}
 

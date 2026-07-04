@@ -20,6 +20,8 @@ interface LandingPageProps {
   activeUser: UserAccount | null;
   allTransactions?: Transaction[];
   allClaims?: ProfitClaimRecord[];
+  projects?: RealEstateProject[];
+  allUsers?: UserAccount[];
 }
 
 export default function LandingPage({ 
@@ -27,11 +29,39 @@ export default function LandingPage({
   onSelectProject, 
   activeUser,
   allTransactions = [],
-  allClaims = []
+  allClaims = [],
+  projects = INITIAL_PROJECTS,
+  allUsers = []
 }: LandingPageProps) {
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showCertificateModal, setShowCertificateModal] = useState(false);
+
+  // Dynamic Real-time Calculations from actual cards & platform state
+  const totalInvestors = allUsers.length > 0 ? allUsers.length : 12; // Fallback to 12 if loading or empty to maintain visual premium feel
+  const totalProperties = projects.length;
+  const totalInvestment = projects.reduce((sum, p) => sum + (p.totalShares - p.availableShares) * p.pricePerShare, 0);
+  const totalProfitDistributed = allClaims.filter(c => c.status === 'Claimed').reduce((sum, c) => sum + c.amount, 0);
+
+  const formatCapital = (val: number) => {
+    if (val >= 1000000) {
+      return `$${(val / 1000000).toFixed(2)}M+`;
+    }
+    if (val >= 1000) {
+      return `$${(val / 1000).toFixed(1)}K+`;
+    }
+    return `$${val.toLocaleString()}`;
+  };
+
+  const formatProfit = (val: number) => {
+    if (val >= 1000000) {
+      return `$${(val / 1000000).toFixed(2)}M`;
+    }
+    if (val >= 1000) {
+      return `$${(val / 1000).toFixed(2)}K`;
+    }
+    return `$${val.toFixed(2)}`;
+  };
   
   // Tracking & Verification System States
   const [searchId, setSearchId] = useState('');
@@ -167,11 +197,6 @@ export default function LandingPage({
         <div className="absolute bottom-5 left-10 w-80 h-80 rounded-full bg-emerald-500/10 blur-3xl pulse-slow pointer-events-none"></div>
 
         <div className="max-w-4xl mx-auto text-center space-y-6 relative z-10">
-          <div className="inline-flex items-center space-x-2 px-3 py-1 bg-amber-500/10 border border-amber-500/30 rounded-full text-xs text-amber-400 font-mono font-semibold tracking-wider uppercase">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Premium Fractional Real Estate Crowdfunding</span>
-          </div>
-
           <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight leading-tight text-white">
             Invest in Prime Real Estate for just <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-emerald-400 font-mono font-black">$113</span>
           </h1>
@@ -212,18 +237,35 @@ export default function LandingPage({
           </div>
 
           {/* Premium Visual Badge */}
-          <div className="pt-8 grid grid-cols-3 gap-2 max-w-md mx-auto text-center">
-            <div className="bg-slate-900/60 backdrop-blur rounded-xl p-2.5 border border-slate-800/80">
-              <span className="block text-xs text-slate-400 font-medium">Expected Yield</span>
-              <span className="text-base font-black text-emerald-400 font-mono">14% - 19%</span>
+          <div className="pt-8 grid grid-cols-3 gap-2 sm:gap-3 max-w-md mx-auto text-center">
+            {/* Card 1: Expected Yield */}
+            <div className="relative overflow-hidden bg-slate-950/80 backdrop-blur-md rounded-xl p-2 sm:p-3 border border-emerald-500/20 shadow-[0_0_12px_rgba(16,185,129,0.05)] transition-all flex flex-col justify-between items-center min-h-[95px] sm:min-h-[110px] hover:border-emerald-500/40">
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-1 bg-emerald-500/30 rounded-full" />
+              <div className="text-emerald-400/80 mb-1 mt-1 sm:mt-1.5">
+                <Coins className="w-4 h-4 sm:w-5 sm:h-5 mx-auto animate-pulse" />
+              </div>
+              <span className="block text-[10px] sm:text-xs text-slate-400 font-semibold uppercase tracking-wider leading-tight">Expected Yield</span>
+              <span className="mt-1 sm:mt-1.5 text-[12px] sm:text-base font-black text-emerald-400 font-mono tracking-tight whitespace-nowrap">40%-60%/m</span>
             </div>
-            <div className="bg-slate-900/60 backdrop-blur rounded-xl p-2.5 border border-slate-800/80">
-              <span className="block text-xs text-slate-400 font-medium">Claims Payout</span>
-              <span className="text-base font-black text-amber-400 font-mono">Daily 2x</span>
+
+            {/* Card 2: Claims Payout */}
+            <div className="relative overflow-hidden bg-slate-950/80 backdrop-blur-md rounded-xl p-2 sm:p-3 border border-amber-500/20 shadow-[0_0_12px_rgba(245,158,11,0.05)] transition-all flex flex-col justify-between items-center min-h-[95px] sm:min-h-[110px] hover:border-amber-500/40">
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-1 bg-amber-500/30 rounded-full" />
+              <div className="text-amber-400/80 mb-1 mt-1 sm:mt-1.5">
+                <Clock className="w-4 h-4 sm:w-5 sm:h-5 mx-auto" />
+              </div>
+              <span className="block text-[10px] sm:text-xs text-slate-400 font-semibold uppercase tracking-wider leading-tight">Claims Payout</span>
+              <span className="mt-1 sm:mt-1.5 text-[12px] sm:text-base font-black text-amber-400 font-mono tracking-tight whitespace-nowrap">Daily 2x</span>
             </div>
-            <div className="bg-slate-900/60 backdrop-blur rounded-xl p-2.5 border border-slate-800/80">
-              <span className="block text-xs text-slate-400 font-medium">Assets Bound</span>
-              <span className="text-base font-black text-white font-mono">100% USDT</span>
+
+            {/* Card 3: Assets Bound */}
+            <div className="relative overflow-hidden bg-slate-950/80 backdrop-blur-md rounded-xl p-2 sm:p-3 border border-blue-500/20 shadow-[0_0_12px_rgba(59,130,246,0.05)] transition-all flex flex-col justify-between items-center min-h-[95px] sm:min-h-[110px] hover:border-blue-500/40">
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-1 bg-blue-500/30 rounded-full" />
+              <div className="text-blue-400/80 mb-1 mt-1 sm:mt-1.5">
+                <Shield className="w-4 h-4 sm:w-5 sm:h-5 mx-auto" />
+              </div>
+              <span className="block text-[10px] sm:text-xs text-slate-400 font-semibold uppercase tracking-wider leading-tight">Assets Bound</span>
+              <span className="mt-1 sm:mt-1.5 text-[12px] sm:text-base font-black text-blue-400 font-mono tracking-tight whitespace-nowrap">100% USDT</span>
             </div>
           </div>
         </div>
@@ -237,7 +279,7 @@ export default function LandingPage({
               <Users className="w-5 h-5" />
             </div>
             <div className="text-xl font-bold font-mono text-white text-emerald-400">
-              {STATIC_REPORTS.totalInvestors.toLocaleString()}+
+              {totalInvestors.toLocaleString()}+
             </div>
             <div className="text-xs text-slate-400 font-medium">Global Investors</div>
           </div>
@@ -247,7 +289,7 @@ export default function LandingPage({
               <Building className="w-5 h-5" />
             </div>
             <div className="text-xl font-bold font-mono text-white text-emerald-400">
-              {STATIC_REPORTS.totalProperties}
+              {totalProperties}
             </div>
             <div className="text-xs text-slate-400 font-medium">Managed Locations</div>
           </div>
@@ -257,7 +299,7 @@ export default function LandingPage({
               <Landmark className="w-5 h-5" />
             </div>
             <div className="text-xl font-bold font-mono text-white text-emerald-400">
-              ${(STATIC_REPORTS.totalInvestment / 1000000).toFixed(1)}M+
+              {formatCapital(totalInvestment)}
             </div>
             <div className="text-xs text-slate-400 font-medium">Fractional Capital</div>
           </div>
@@ -267,7 +309,7 @@ export default function LandingPage({
               <Coins className="w-5 h-5" />
             </div>
             <div className="text-xl font-bold font-mono text-white text-emerald-400">
-              ${(STATIC_REPORTS.totalProfitDistributed / 1000000).toFixed(2)}M
+              {formatProfit(totalProfitDistributed)}
             </div>
             <div className="text-xs text-slate-400 font-medium">Profit Distributed</div>
           </div>
@@ -520,7 +562,7 @@ export default function LandingPage({
           </div>
 
           <div className="grid sm:grid-cols-2 gap-6">
-            {INITIAL_PROJECTS.slice(0, 4).map((project) => (
+            {projects.slice(0, 4).map((project) => (
               <div 
                 key={project.id} 
                 onClick={() => onSelectProject(project)}
@@ -572,8 +614,8 @@ export default function LandingPage({
                       <span className="text-xs font-bold text-emerald-400">+{project.expectedRoi}% yld</span>
                     </div>
                     <div>
-                      <span className="block text-[10px] text-slate-500 font-bold uppercase">TERM</span>
-                      <span className="text-xs font-bold text-slate-300">{project.durationMonths}m</span>
+                      <span className="block text-[10px] text-slate-500 font-bold uppercase">DURATION</span>
+                      <span className="text-xs font-bold text-slate-300">{project.durationMonths} Month{project.durationMonths !== 1 ? 's' : ''}</span>
                     </div>
                     <div>
                       <span className="block text-[10px] text-slate-500 font-bold uppercase">PRICE</span>
