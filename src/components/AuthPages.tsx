@@ -86,6 +86,8 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
   const [mockVerificationSentTo, setMockVerificationSentTo] = useState('');
   const [generatedOtp, setGeneratedOtp] = useState('');
   const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [emailSendError, setEmailSendError] = useState<string | null>(null);
+  const [showMockFallback, setShowMockFallback] = useState(false);
   const [showBackupCode, setShowBackupCode] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
@@ -365,6 +367,8 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
     e.preventDefault();
     setErrorMsg('');
     setSuccessMsg('');
+    setEmailSendError(null);
+    setShowMockFallback(false);
 
     if (!email || !fullName || !password) {
       setErrorMsg('Please fill in all mandatory account fields.');
@@ -422,11 +426,15 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
             setSuccessMsg(`Your registration is already in progress. A new verification OTP code has been sent to ${cleanEmail}.`);
           } else {
             console.warn("Real-time email sending fallback triggered:", res.error);
+            setEmailSendError(res.error || "Failed to deliver OTP via real email.");
+            setShowMockFallback(true);
           }
           setScreen('verify');
           addSystemLog('Register_Referral', `Pending registration resumed for ${cleanEmail}. OTP ${code} dispatched.`, 'Secure');
-        } catch (err) {
+        } catch (err: any) {
           setIsSendingOtp(false);
+          setEmailSendError(err.message || "Failed to contact proxy email service.");
+          setShowMockFallback(true);
           setScreen('verify');
         }
         return;
@@ -491,11 +499,15 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
         setSuccessMsg(`A verification code was sent to ${cleanEmail} via fundora.one.`);
       } else {
         console.warn("Real-time email sending fallback triggered:", res.error);
+        setEmailSendError(res.error || "Failed to deliver OTP via real email.");
+        setShowMockFallback(true);
       }
       setScreen('verify');
       addSystemLog('Register_Referral', `New registration initialized with email ${cleanEmail}. OTP ${code} dispatched. Referral code used: ${referrer || 'None'}`, 'Secure');
-    } catch (err) {
+    } catch (err: any) {
       setIsSendingOtp(false);
+      setEmailSendError(err.message || "Failed to contact proxy email service.");
+      setShowMockFallback(true);
       setScreen('verify');
     }
   };
@@ -546,6 +558,8 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
     e.preventDefault();
     setErrorMsg('');
     setSuccessMsg('');
+    setEmailSendError(null);
+    setShowMockFallback(false);
 
     if (!email) {
       setErrorMsg('Please specify your registered investment email.');
@@ -577,12 +591,15 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
         setSuccessMsg(`A password reset verification code has been dispatched to ${cleanEmail}.`);
       } else {
         console.warn("Real-time email sending fallback triggered:", res.error);
-        setSuccessMsg(`[SIMULATION] Verification OTP: ${code}`);
+        setEmailSendError(res.error || "Failed to deliver OTP via real email.");
+        setShowMockFallback(true);
       }
       setScreen('forgot-verify');
       addSystemLog('System_Log', `Password reset initialized for ${cleanEmail}. OTP ${code} dispatched.`, 'Secure');
-    } catch (err) {
+    } catch (err: any) {
       setIsSendingOtp(false);
+      setEmailSendError(err.message || "Failed to contact proxy email service.");
+      setShowMockFallback(true);
       setScreen('forgot-verify');
     }
   };
@@ -590,6 +607,8 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
   const handleResendForgotPasswordOtp = async () => {
     setErrorMsg('');
     setSuccessMsg('');
+    setEmailSendError(null);
+    setShowMockFallback(false);
     const cleanEmail = mockVerificationSentTo.trim().toLowerCase() || email.trim().toLowerCase();
     if (!cleanEmail) return;
 
@@ -610,11 +629,14 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
         setSuccessMsg(`A new password reset verification code has been dispatched to ${cleanEmail}.`);
       } else {
         console.warn("Real-time email sending fallback triggered:", res.error);
-        setSuccessMsg(`[SIMULATION] Resent OTP: ${code}`);
+        setEmailSendError(res.error || "Failed to deliver OTP via real email.");
+        setShowMockFallback(true);
       }
       addSystemLog('System_Log', `Password reset OTP resent for ${cleanEmail}. New OTP ${code} dispatched.`, 'Secure');
-    } catch (err) {
+    } catch (err: any) {
       setIsSendingOtp(false);
+      setEmailSendError(err.message || "Failed to contact proxy email service.");
+      setShowMockFallback(true);
     }
   };
 
@@ -1013,10 +1035,20 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
                   Enter the code sent to <strong className="text-white font-mono">{mockVerificationSentTo}</strong> and choose your new password.
                 </p>
 
-                {!isEmailServiceConfigured() && (
+                {emailSendError && (
+                  <div className="p-3 bg-red-500/10 border border-red-500/30 text-red-300 rounded-xl text-[11px] leading-relaxed text-left font-sans mb-1">
+                    <p className="font-extrabold uppercase tracking-wide text-[9px] text-red-400">⚠️ Email Delivery Failed</p>
+                    <p className="text-slate-300 font-mono mt-1 text-[10px] break-all">{emailSendError}</p>
+                    <p className="text-slate-400 mt-1.5 text-[10px]">
+                      Please check your Vercel/Resend setup. Your Resend API Key might be invalid or you have not verified the sending domain in Resend.
+                    </p>
+                  </div>
+                )}
+
+                {(!isEmailServiceConfigured() || showMockFallback) && (
                   <div className="p-3 bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded-xl text-[11px] leading-relaxed text-center font-sans">
                     <p className="font-extrabold uppercase tracking-wide text-[9px] text-amber-400">✨ Developer Simulation Active</p>
-                    <p className="text-slate-300 text-[10px]">Use this simulated reset code:</p>
+                    <p className="text-slate-300 text-[10px]">Use this simulated reset code to bypass:</p>
                     <p className="text-lg font-mono font-black text-amber-400 tracking-wider my-1 select-all">{generatedOtp}</p>
                     <button
                       type="button"
@@ -1118,14 +1150,24 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
                   An authentication code was dispatched to your email address <strong className="text-white font-mono">{mockVerificationSentTo}</strong>.
                 </p>
 
-                {isEmailServiceConfigured() ? (
+                {emailSendError && (
+                  <div className="p-3 bg-red-500/10 border border-red-500/30 text-red-300 rounded-xl text-[11px] leading-relaxed text-left font-sans mb-1">
+                    <p className="font-extrabold uppercase tracking-wide text-[9px] text-red-400">⚠️ Email Delivery Failed</p>
+                    <p className="text-slate-300 font-mono mt-1 text-[10px] break-all">{emailSendError}</p>
+                    <p className="text-slate-400 mt-1.5 text-[10px]">
+                      Please check your Vercel/Resend setup. Your Resend API Key might be invalid or you have not verified the sending domain in Resend.
+                    </p>
+                  </div>
+                )}
+
+                {isEmailServiceConfigured() && !showMockFallback ? (
                   <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-xl text-[11px] leading-relaxed text-center">
                     <p>Check your email inbox or spam folder for your 6-digit confirmation code.</p>
                   </div>
                 ) : (
                   <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded-xl text-xs space-y-1 text-center font-sans">
                     <p className="font-extrabold uppercase tracking-wide text-[10px]">✨ Developer Simulation Active</p>
-                    <p className="text-[11px] text-slate-300">EmailJS is disabled. Use this simulated verification code:</p>
+                    <p className="text-[11px] text-slate-300">Use this simulated verification code to bypass:</p>
                     <p className="text-xl font-mono font-black text-amber-400 tracking-widest mt-1.5 select-all">
                       {generatedOtp}
                     </p>

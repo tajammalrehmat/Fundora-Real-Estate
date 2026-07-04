@@ -60,6 +60,7 @@ export const sendOtpEmail = async (params: EmailParams): Promise<{ success: bool
   if (EMAIL_SERVICE_ACTIVE || RESEND_API_KEY) {
     console.log(`[Email Service] Resend is configured. Attempting to deliver premium OTP to ${toEmail}...`);
     let proxyFailed = false;
+    let proxyErrorDetail = '';
 
     // First, try the proxy server route (Express backend or Vercel serverless function /api/send-otp)
     try {
@@ -81,10 +82,12 @@ export const sendOtpEmail = async (params: EmailParams): Promise<{ success: bool
       } else {
         const errorText = await response.text();
         console.warn(`Resend API Proxy returned error (${response.status}): ${errorText}. Attempting direct client-side fallback...`);
+        proxyErrorDetail = `Server returned status ${response.status}: ${errorText}`;
         proxyFailed = true;
       }
     } catch (err: any) {
       console.warn(`Resend API Proxy unreachable (normal for static Vercel SPA hosting): ${err.message}. Attempting direct client-side fallback...`);
+      proxyErrorDetail = `Fetch error: ${err.message || 'Unknown network error'}`;
       proxyFailed = true;
     }
 
@@ -165,7 +168,7 @@ Fundora
     } else if (proxyFailed) {
       return {
         success: false,
-        error: `Resend delivery failed. Please verify that the RESEND_API_KEY environment variable is configured correctly in your Vercel project dashboard.`
+        error: `Resend delivery failed. Details: ${proxyErrorDetail || 'Unknown proxy server failure'}`
       };
     }
   }
