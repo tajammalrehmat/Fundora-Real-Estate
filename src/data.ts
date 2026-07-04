@@ -19,7 +19,7 @@ export const INITIAL_PROJECTS: RealEstateProject[] = [
     durationMonths: 12,
     description: 'Luxurious fully-furnished serviced studio apartments managed by a premium London hospitality chain. It offers a hassle-free, fully managed luxury residential yield with exceptional occupancy rates.',
     status: 'Sold Out',
-    documents: ['Suite_Specs_Kensington.pdf', 'UK_Building_Permit.pdf']
+    documents: ['Kensington_Palace_Specs.pdf', 'Kensington_Palace_Approval.pdf', 'Kensington_Palace_NOC.pdf']
   },
   {
     id: 'proj-6',
@@ -34,7 +34,7 @@ export const INITIAL_PROJECTS: RealEstateProject[] = [
     durationMonths: 24,
     description: 'Ultra-luxurious serviced apartments situated directly opposite Burj Khalifa. Managed by the Emaar hospitality group, offering premium tax-free rental yields and high-frequency capital appreciation.',
     status: 'Active',
-    documents: ['Emaar_Downtown_Specs.pdf', 'Dubai_DLD_Approval.pdf', 'NOC_Emaar_Properties.pdf']
+    documents: ['Emaar_Downtown_Specs.pdf', 'Emaar_Downtown_Approval.pdf', 'Emaar_Downtown_NOC.pdf']
   }
 ];
 

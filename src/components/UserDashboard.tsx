@@ -706,6 +706,13 @@ export default function UserDashboard({
   const handleDepositSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setDepositSuccessMsg('');
+    
+    // Screenshot upload is compulsory
+    if (!depositProofInput) {
+      showStatus("❌ Screenshot proof is compulsory! Please upload a screenshot of your payment to proceed.", "error");
+      return;
+    }
+
     if (!depositHashInput || depositHashInput.trim().length < 8) {
       showStatus("Please enter a valid USDT transaction TxID hash to allow node verification.", "error");
       return;
@@ -714,7 +721,7 @@ export default function UserDashboard({
       depositAmount,
       depositNetwork,
       depositHashInput,
-      depositProofInput || 'screenshot_proof_simulated.png'
+      depositProofInput
     );
     setDepositSuccessMsg("Your deposit proof has been received! Our blockchain auditors will brief confirmation logs shortly.");
     showStatus("Deposit receipt logged under status: PENDING verification.", "success");
@@ -2339,15 +2346,29 @@ export default function UserDashboard({
                         {/* Secondary text */}
                         <div className="mt-6 space-y-3">
                           <h4 className="font-bold text-slate-900 uppercase tracking-wider text-[10px]">
-                            1. Legal Attestation & Escrow Protection
-                          </h4>
-                          <p className="text-[10px] text-slate-600">
-                            {activeViewDoc.docName.toLowerCase().includes('brochure') || activeViewDoc.docName.toLowerCase().includes('specs') ? (
-                              `The prospectus describes a premium investment asset offering. Average occupancy yields exceed traditional residential holdings by an estimated ${(activeViewDoc.project.expectedRoi - 2).toFixed(1)}%. Distributions are paid out in equivalent USDT digital assets following monthly operations reports.`
-                            ) : activeViewDoc.docName.toLowerCase().includes('registry') || activeViewDoc.docName.toLowerCase().includes('approval') || activeViewDoc.docName.toLowerCase().includes('permit') ? (
-                              `This property has been officially approved by the Land Registry. Title Deeds are stored in fractional custody vaults under Index UK-REG-${activeViewDoc.project.id}492A. Escrow controls ensure that direct physical title is legally reserved strictly to protect the co-owners of fractionalized blocks.`
+                            {activeViewDoc.docName.toLowerCase().includes('specs') ? (
+                              "1. Detailed Specifications & Layout"
+                            ) : activeViewDoc.docName.toLowerCase().includes('approval') || activeViewDoc.docName.toLowerCase().includes('permit') ? (
+                              "1. Official Regulatory & Development Approval"
                             ) : (
-                              `A permanent No-Objection Consent (NOC) has been issued for this asset. It guarantees that the property remains unencumbered and fully cleared for tokenized micro-liquidity distributions under municipal, national, and international standards.`
+                              "1. Official No Objection Certificate (NOC) Declaration"
+                            )}
+                          </h4>
+                          <p className="text-[10px] text-slate-600 whitespace-pre-wrap leading-relaxed">
+                            {activeViewDoc.docName.toLowerCase().includes('specs') ? (
+                              `This document certifies the technical specifications and structural blueprints for "${activeViewDoc.project.name}" located at ${activeViewDoc.project.location}.
+
+Asset Details:
+- Target Expected Return: ${activeViewDoc.project.expectedRoi}% APR
+- Total Unit Shares: ${activeViewDoc.project.totalShares}
+- Single Share Price: $${activeViewDoc.project.pricePerShare} USDT
+
+Structural Features & Layout:
+${activeViewDoc.project.description}`
+                            ) : activeViewDoc.docName.toLowerCase().includes('approval') || activeViewDoc.docName.toLowerCase().includes('permit') ? (
+                              `RERA (Real Estate Regulatory Agency) and the planning councils hereby confirm that all safety audits, zoning approvals, structural blueprints, and environmental impact assessments for "${activeViewDoc.project.name}" located at ${activeViewDoc.project.location} have been thoroughly audited, approved, and signed off under registry index UK-REG-${activeViewDoc.project.id}492A-X.`
+                            ) : (
+                              `The sovereign land registry and local municipal boards certify that they have NO OBJECTION to the fractionalized co-ownership, tokenization, or distribution of yield from "${activeViewDoc.project.name}" located at ${activeViewDoc.project.location}. This asset is certified as clean, free of any lien, and verified for digital asset vaults.`
                             )}
                           </p>
                           
@@ -2658,7 +2679,9 @@ export default function UserDashboard({
                   {/* Deposit Amount configuration */}
                   <div className="space-y-2.5 font-mono">
                     <div className="flex justify-between items-center">
-                      <span className="text-[10px] text-indigo-300 font-extrabold uppercase tracking-wider block">2. Deposit Amount (USDT)</span>
+                      <span className="text-[10px] text-indigo-300 font-extrabold uppercase tracking-wider block">
+                        2. Deposit Amount (USDT) <span className="text-amber-400 font-bold text-[8.5px] ml-1 uppercase">(Auto-filled from Screenshot)</span>
+                      </span>
                       <span className="text-[9px] text-emerald-400 font-extrabold bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 rounded-md">
                         Estimated: {(depositAmount / 113).toFixed(2)} Slots
                       </span>
@@ -2805,7 +2828,9 @@ export default function UserDashboard({
 
                   {/* Transaction ID Hash submission */}
                   <div className="space-y-2 font-mono">
-                    <span className="text-[10px] text-indigo-300 uppercase font-extrabold tracking-wider block">3. Transaction Hash (TxID)</span>
+                    <span className="text-[10px] text-indigo-300 uppercase font-extrabold tracking-wider block">
+                      3. Transaction Hash (TxID) <span className="text-amber-400 font-bold text-[8.5px] ml-1 uppercase">(Auto-filled from Screenshot below)</span>
+                    </span>
                     <input 
                       type="text"
                       required
@@ -2818,7 +2843,11 @@ export default function UserDashboard({
 
                   {/* Interactive proof of payment slip uploader */}
                   <div className="space-y-2 font-mono text-[10px]">
-                    <span className="text-[10px] text-indigo-300 uppercase font-extrabold tracking-wider block">4. Receipt Proof Screenshot</span>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-indigo-300 uppercase font-extrabold tracking-wider block">
+                        4. Receipt Proof Screenshot <span className="text-rose-400 font-extrabold text-[9px] ml-1 bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 rounded-md uppercase tracking-wide">COMPULSORY / compulsory</span>
+                      </span>
+                    </div>
                     
                     {/* Hidden Native File Input */}
                     <input 
@@ -2835,7 +2864,7 @@ export default function UserDashboard({
                           fileInputRef.current?.click();
                         }
                       }}
-                      className="border-2 border-dashed border-indigo-500/30 hover:border-indigo-500/60 bg-[#13163a]/40 hover:bg-[#13163a]/75 p-6 rounded-2xl text-center space-y-2.5 cursor-pointer transition-all duration-200 relative overflow-hidden shadow-2xs"
+                      className="border-2 border-dashed border-rose-500/30 hover:border-indigo-500/60 bg-[#13163a]/40 hover:bg-[#13163a]/75 p-6 rounded-2xl text-center space-y-2.5 cursor-pointer transition-all duration-200 relative overflow-hidden shadow-2xs"
                     >
                       {isAnalyzingReceipt ? (
                         <div className="py-3 space-y-3 flex flex-col items-center justify-center">
@@ -2847,7 +2876,7 @@ export default function UserDashboard({
                         </div>
                       ) : (
                         <div className="flex flex-col items-center justify-center space-y-1.5 py-1">
-                          <Upload className="w-5.5 h-5.5 text-indigo-400" />
+                          <Upload className="w-5.5 h-5.5 text-rose-400" />
                           <div>
                             {depositProofInput ? (
                               <div className="space-y-1.5">
@@ -2856,8 +2885,11 @@ export default function UserDashboard({
                               </div>
                             ) : (
                               <>
-                                <span className="text-[11px] text-white font-bold block font-sans">Choose or Drag Receipt File</span>
-                                <p className="text-[8.5px] text-indigo-300/60 block font-sans">Click to attach PNG or JPG file of the payment snapshot</p>
+                                <span className="text-[11px] text-rose-300 font-bold block font-sans uppercase">⚠️ UPLOAD TRANSACTION SCREENSHOT (COMPULSORY)</span>
+                                <p className="text-[8.5px] text-indigo-200 block font-sans leading-relaxed mt-1">
+                                  Select or drag any exchange or wallet screenshot to auto-fetch transaction details.<br />
+                                  <span className="text-emerald-400 font-extrabold text-[8.5px] uppercase">✨ AI will automatically fetch TxID & amount so you don't have to fill them manually!</span>
+                                </p>
                               </>
                             )}
                           </div>

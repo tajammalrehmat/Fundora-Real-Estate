@@ -238,26 +238,62 @@ export function generateDocumentPDF(docName: string, project: any) {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11);
   doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-  doc.text('REGULATORY & TRUSTEE STATEMENTS', 15, y);
+
+  let legalText = '';
+  let subTitle = 'REGULATORY & TRUSTEE STATEMENTS';
+  if (docName.toLowerCase().includes('specs')) {
+    subTitle = 'DETAILED PHYSICAL & TECHNICAL SPECIFICATIONS';
+    legalText = `This document certifies the technical specifications and structural blueprints for the property project "${project.name}" located at ${project.location}.
+
+Property Specifications & Parameters:
+- Asset Classification: ${project.category || 'Luxury Real Estate Asset'}
+- Total Unit Shares: ${project.totalShares} Shares
+- Individual Share Valuation: $${project.pricePerShare} USDT / Share
+- Target Projected Annual ROI: ${project.expectedRoi}% APR
+
+Structural & Layout Details:
+${project.description}
+
+All structural materials, load bearings, electrical fittings, and architectural systems comply fully with regional luxury zoning and premium building safety standards. Certified and validated for digital custody under Fundora Trust.`;
+  } else if (docName.toLowerCase().includes('approval') || docName.toLowerCase().includes('permit')) {
+    subTitle = 'OFFICIAL REGULATORY & DEVELOPMENT APPROVAL';
+    legalText = `This certificate grants formal development and regulatory compliance approval for "${project.name}" located at ${project.location}.
+
+Regulatory Approval Metrics:
+- Review Authority: Municipal Development Authority & Real Estate Regulatory Agency (RERA)
+- Compliance Standard: ERC-3643 Securities Protocol Verified
+- Zoning Allocation: Multi-Tenant Residential / Luxury Commercial Space
+- Escrow Security Level: Tier-1 Bank-Backed Digital Escrow Guard
+
+Approval Statement:
+RERA and the planning councils hereby confirm that all safety audits, zoning approvals, structural blueprints, and environmental impact assessments for "${project.name}" have been completed, authorized, and signed off. Digital fractional shares issued under Registry ID PROJ-00${project.id} are cleared for secure public co-ownership.`;
+  } else {
+    subTitle = 'OFFICIAL NO OBJECTION CERTIFICATE (NOC)';
+    legalText = `This document serves as an absolute, unconditional No Objection Certificate (NOC) for "${project.name}" located at ${project.location}.
+
+NOC Grantee Details:
+- Asset Name: ${project.name}
+- Securitization ID: SEC-RWA-00${project.id}
+- Escrow Controller: Fundora Global Asset Custody Trust LLC
+- Scope: Digital Tokenization & Fractional Co-Ownership Distribution
+
+NOC Declaration:
+The sovereign land registry and local municipal boards have reviewed the digital prospectus and escrow structures of "${project.name}". We certify that we have NO OBJECTION to the fractionalized co-ownership, distribution, or tokenized secondary trading of this asset. This property holds a clean title, is free of any lien, hypothecation, or encumbrance, and is officially approved for fractional yield settlements.`;
+  }
+
+  doc.text(subTitle, 15, y);
   y += 6;
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.5);
   doc.setTextColor(100, 116, 139);
 
-  let legalText = '';
-  if (docName.toLowerCase().includes('brochure') || docName.toLowerCase().includes('specs')) {
-    legalText = `The asset represents high-yield fractionalized holdings managed by certified property administrators. Annual yield forecasts target ${project.expectedRoi}% APR with monthly settlement distributions. Minimum lockup and risk parameters adhere to regulatory guidelines. Fully backed by solid real-world physical properties.`;
-  } else if (docName.toLowerCase().includes('registry') || docName.toLowerCase().includes('approval') || docName.toLowerCase().includes('permit')) {
-    legalText = `Certified by the local Land Registry authority. This document is on file under registry index Ref: UK-REG-${project.id}492A-X. Total asset ownership blocks are locked in smart escrow accounts to protect shareholders from third-party liquidation claims. Verified compliant with standard zoning regulations.`;
-  } else {
-    legalText = `All-conditions Non-Objection Consent (NOC) granted for fractioned liquidity issuance. Licensed by municipal development councils and local governments. This certificate remains legally binding under international digital asset compliance protocols for the duration of the 12-Month investment vaults.`;
-  }
+  const splitText = doc.splitTextToSize(legalText, 180);
+  doc.text(splitText, 15, y);
 
-  doc.text(legalText, 15, y, { maxWidth: 180 });
-
-  // 4. Verification Seal Box
-  y += 28;
+  // Calculate dynamic text height. 8.5 pt font is roughly 3.5mm per line (including default line spacing)
+  const textHeight = splitText.length * 3.5;
+  y += textHeight + 8;
   doc.setFillColor(248, 250, 252); // Slate 50
   doc.setDrawColor(203, 213, 225); // Slate 300
   doc.roundedRect(15, y, pageWidth - 30, 32, 3, 3, 'FD');
