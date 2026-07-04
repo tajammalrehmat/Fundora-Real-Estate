@@ -151,7 +151,7 @@ export default function UserDashboard({
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
 
   // Deposit Form Info
-  const [depositAmount, setDepositAmount] = useState<number>(113);
+  const [depositAmount, setDepositAmount] = useState<number>(0);
   const [depositNetwork, setDepositNetwork] = useState<'TRC20' | 'BEP20'>('TRC20');
   const [depositHashInput, setDepositHashInput] = useState('');
   const [depositProofInput, setDepositProofInput] = useState(''); // Text representation / simulated file
@@ -2624,122 +2624,82 @@ ${activeViewDoc.project.description}`
 
             {walletSubTab === 'deposit' ? (
               /* LEFT COLUMN: USDT DEPOSIT PORTAL GATEWAY */
-              <div id="binance-deposit-module" className="bg-[#0e112d] border border-emerald-500/30 rounded-[1.25rem] p-4 sm:p-6 space-y-6 shadow-xl text-white animate-fadeIn w-full max-w-2xl">
-
+              <div id="binance-deposit-module" className="bg-[#0e112d] border border-indigo-500/20 rounded-[1.25rem] p-4.5 sm:p-6 space-y-4.5 shadow-2xl text-white animate-fadeIn w-full max-w-2xl relative overflow-hidden">
+                {/* Visual Accent Corner */}
+                <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none"></div>
 
                 {depositSuccessMsg && (
-                  <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-emerald-300 leading-normal font-sans shadow-2xs flex items-center gap-2.5 animate-fadeIn">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping shrink-0"></span>
-                    <span className="font-semibold">{depositSuccessMsg}</span>
+                  <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-emerald-300 leading-normal font-sans shadow-2xs flex items-center gap-3 animate-fadeIn">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                    <div>
+                      <span className="font-extrabold uppercase text-[10px] tracking-wide block text-emerald-400">Success Code Dispatched</span>
+                      <span className="font-medium text-[10px] opacity-90">{depositSuccessMsg}</span>
+                    </div>
                   </div>
                 )}
 
                 <form onSubmit={handleDepositSubmit} className="space-y-6 text-xs font-mono">
                   
-                  {/* Network Toggles with visuals (TRC20 vs BEP20) */}
-                  <div className="space-y-2.5 font-mono">
-                    <span className="text-[10px] text-indigo-300 font-extrabold uppercase tracking-wider block">1. Blockchain Network Selection</span>
-                    <div className="grid grid-cols-2 gap-4">
-                      
-                      {/* TRC20 Card Selector */}
+                  {/* STEP 1: BLOCKCHAIN NETWORK & DESTINATION DETAILS */}
+                  <div className="bg-[#11132e]/50 border border-indigo-500/15 rounded-2xl p-4 sm:p-5 space-y-3.5 shadow-2xs">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] bg-indigo-600 text-white font-extrabold w-5 h-5 rounded-md flex items-center justify-center shrink-0">1</span>
+                      <span className="text-[10px] sm:text-[11px] text-slate-100 font-extrabold uppercase tracking-wider block font-sans leading-tight">
+                        Choose Network & Destination
+                      </span>
+                    </div>
+
+                    {/* Network Toggles */}
+                    <div className="grid grid-cols-2 gap-3.5 pt-1">
+                      {/* TRC20 Selector */}
                       <div 
                         onClick={() => {
                           setDepositNetwork('TRC20');
                           showStatus("Switched payment destination to Tron blockchain (TRC20).", "info");
                         }}
-                        className={`p-4 rounded-xl border-2 text-center cursor-pointer transition-all duration-300 relative ${
+                        className={`p-3.5 rounded-xl border-2 text-center cursor-pointer transition-all duration-300 ${
                           depositNetwork === 'TRC20'
-                            ? 'bg-[#060819] text-white border-indigo-500 shadow-md ring-4 ring-indigo-500/20'
-                            : 'bg-[#13163a]/50 border-indigo-500/20 text-indigo-200 hover:bg-[#13163a] hover:border-indigo-500/40'
+                            ? 'bg-[#060819] text-white border-indigo-500 shadow-md ring-4 ring-indigo-500/25'
+                            : 'bg-[#13163a]/40 border-indigo-500/10 text-indigo-300 hover:bg-[#13163a] hover:border-indigo-500/30'
                         }`}
                       >
-                        <span className="font-extrabold block font-sans text-xs">USDT - TRC20</span>
-                        <span className={`text-[9px] font-mono block mt-1 ${depositNetwork === 'TRC20' ? 'text-indigo-300' : 'text-slate-400'}`}>Tron Mainnet (TRX)</span>
+                        <span className="font-extrabold block font-sans text-xs">USDT (TRC20)</span>
+                        <span className="text-[8px] text-indigo-400 block mt-0.5 uppercase tracking-wide">Tron Blockchain</span>
                       </div>
 
-                      {/* BEP20 Card Selector */}
+                      {/* BEP20 Selector */}
                       <div 
                         onClick={() => {
                           setDepositNetwork('BEP20');
                           showStatus("Switched payment destination to Binance Smart Chain (BEP20).", "info");
                         }}
-                        className={`p-4 rounded-xl border-2 text-center cursor-pointer transition-all duration-300 relative ${
+                        className={`p-3.5 rounded-xl border-2 text-center cursor-pointer transition-all duration-300 ${
                           depositNetwork === 'BEP20'
-                            ? 'bg-[#060819] text-white border-indigo-500 shadow-md ring-4 ring-indigo-500/20'
-                            : 'bg-[#13163a]/50 border-indigo-500/20 text-indigo-200 hover:bg-[#13163a] hover:border-indigo-500/40'
+                            ? 'bg-[#060819] text-white border-indigo-500 shadow-md ring-4 ring-indigo-500/25'
+                            : 'bg-[#13163a]/40 border-indigo-500/10 text-indigo-300 hover:bg-[#13163a] hover:border-indigo-500/30'
                         }`}
                       >
-                        <span className="font-extrabold block font-sans text-xs">USDT - BEP20</span>
-                        <span className={`text-[9px] font-mono block mt-1 ${depositNetwork === 'BEP20' ? 'text-indigo-300' : 'text-slate-400'}`}>Binance Smart Chain</span>
+                        <span className="font-extrabold block font-sans text-xs">USDT (BEP20)</span>
+                        <span className="text-[8px] text-indigo-400 block mt-0.5 uppercase tracking-wide">BNB Smart Chain</span>
                       </div>
-
-                    </div>
-                  </div>
-
-                  {/* Deposit Amount configuration */}
-                  <div className="space-y-2.5 font-mono">
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] text-indigo-300 font-extrabold uppercase tracking-wider block">
-                        2. Deposit Amount (USDT) <span className="text-amber-400 font-bold text-[8.5px] ml-1 uppercase">(Auto-filled from Screenshot)</span>
-                      </span>
-                      <span className="text-[9px] text-emerald-400 font-extrabold bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 rounded-md">
-                        Estimated: {(depositAmount / 113).toFixed(2)} Slots
-                      </span>
-                    </div>
-                    
-                    <div className="relative">
-                      <span className="absolute left-4 top-3.5 text-indigo-300 font-bold text-sm">$</span>
-                      <input 
-                        type="number"
-                        required
-                        min={10}
-                        value={depositAmount}
-                        onChange={(e) => setDepositAmount(Number(e.target.value))}
-                        className="w-full bg-[#060819] border border-indigo-500/30 rounded-xl py-3.5 pl-8 pr-4 text-xs text-white font-extrabold focus:outline-none focus:border-indigo-400 shadow-2xs transition-all"
-                      />
                     </div>
 
-                    {/* Preconfigured amount shortcut blocks */}
-                    <div className="flex flex-wrap gap-2 pt-1">
-                      {[50, 100, 250, 500, 1000].map((amt) => (
-                        <button
-                          key={amt}
-                          type="button"
-                          onClick={() => {
-                            setDepositAmount(amt);
-                            showStatus(`Deposit set to $${amt} USDT. (Estimates ${Math.floor(amt / 113)} share packages)`, "info");
-                          }}
-                          className={`px-3.5 py-1.5 border rounded-lg text-[10px] font-bold cursor-pointer transition-all ${
-                            depositAmount === amt 
-                              ? 'bg-gradient-to-r from-indigo-500 to-violet-600 border border-indigo-400 text-white shadow-sm' 
-                              : 'bg-[#13163a] hover:bg-[#1b1f51] border-indigo-500/30 text-indigo-200'
-                          }`}
-                        >
-                          +${amt}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Highly polished, responsive corporate destination info center (light themed) */}
-                  <div className="bg-[#13163a]/40 border border-indigo-500/30 rounded-2xl p-4 sm:p-5 space-y-4 shadow-2xs relative overflow-hidden">
-                    <div className="absolute top-0 left-0 right-0 h-1 bg-amber-500"></div>
-                    
-                    <div className="space-y-3 text-left">
-                      <span className="text-[10px] text-amber-400 uppercase block font-extrabold tracking-wider font-sans">
-                        Corporate Destination Wallet Address ({depositNetwork})
-                      </span>
+                    {/* Unified Address Card & QR Code Row */}
+                    <div className="bg-[#060819]/95 border border-indigo-500/20 rounded-xl p-4 space-y-4">
                       
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center justify-between bg-[#060819] border border-indigo-500/20 p-3.5 rounded-xl">
-                        <div className="w-full min-w-0">
-                          <span className={`text-xs select-all block break-all font-mono leading-relaxed tracking-tight ${
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-center justify-between">
+                        <div className="space-y-1.5 min-w-0">
+                          <span className="text-[9px] text-indigo-400 uppercase font-bold tracking-wider block font-sans">
+                            Official {depositNetwork} Wallet Address
+                          </span>
+                          <span className={`text-[11.5px] select-all block break-all font-mono leading-relaxed tracking-tight font-extrabold ${
                             (depositNetwork === 'TRC20' ? systemSettings.usdtTrc20Address : systemSettings.usdtBep20Address)
-                              ? 'text-white font-extrabold'
-                              : 'text-rose-400 font-sans font-bold italic'
+                              ? 'text-emerald-400'
+                              : 'text-rose-400 font-sans italic font-bold'
                           }`}>
                             {(depositNetwork === 'TRC20' 
                               ? (systemSettings.usdtTrc20Address || '') 
-                              : (systemSettings.usdtBep20Address || '')) || '⚠️ Wallet address not configured by platform admin'}
+                              : (systemSettings.usdtBep20Address || '')) || '⚠️ Address not configured by administrator'}
                           </span>
                         </div>
                         
@@ -2752,16 +2712,16 @@ ${activeViewDoc.project.description}`
                               : (systemSettings.usdtBep20Address || ''),
                             'address'
                           )}
-                          className={`px-4 py-2.5 rounded-lg text-[10px] uppercase font-bold tracking-wider shrink-0 transition-all cursor-pointer inline-flex items-center justify-center gap-1.5 w-full sm:w-auto ${
+                          className={`px-4 py-2.5 rounded-lg text-[9.5px] uppercase font-bold tracking-wider shrink-0 transition-all cursor-pointer inline-flex items-center justify-center gap-1.5 w-full sm:w-auto ${
                             copiedText === 'address'
-                              ? 'bg-emerald-600 border border-emerald-500 text-white'
-                              : 'bg-gradient-to-r from-indigo-500 to-violet-600 border border-indigo-400 text-white hover:border-indigo-300 disabled:opacity-45 disabled:cursor-not-allowed'
+                              ? 'bg-emerald-600 border border-emerald-500 text-white shadow-lg shadow-emerald-600/10'
+                              : 'bg-indigo-600/80 hover:bg-indigo-600 border border-indigo-500/40 text-white hover:border-indigo-400 disabled:opacity-45 disabled:cursor-not-allowed shadow-md'
                           }`}
                         >
                           {copiedText === 'address' ? (
                             <>
                               <span>✓</span>
-                              <span>Copied</span>
+                              <span>Copied!</span>
                             </>
                           ) : (
                             <>
@@ -2771,84 +2731,73 @@ ${activeViewDoc.project.description}`
                           )}
                         </button>
                       </div>
-                    </div>
 
-                    {/* QR Code and Scanning Guideline Row */}
-                    <div className="flex flex-col sm:flex-row items-center gap-4 bg-[#060819] p-4 rounded-xl border border-indigo-500/20 shadow-3xs">
-                      <div className="w-20 h-20 bg-[#13163a] p-1.5 rounded-xl shrink-0 flex items-center justify-center border border-indigo-500/25 relative overflow-hidden select-none">
-                        {depositNetwork === 'TRC20' ? (
-                          systemSettings.usdtTrc20QrCode ? (
-                            <img 
-                              src={systemSettings.usdtTrc20QrCode} 
-                              alt="USDT TRC20 QR"
-                              className="w-full h-full object-contain"
-                              referrerPolicy="no-referrer"
-                            />
-                          ) : systemSettings.usdtTrc20Address ? (
-                            <img 
-                              src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(systemSettings.usdtTrc20Address)}`} 
-                              alt="USDT TRC20 QR"
-                              className="w-full h-full object-contain"
-                              referrerPolicy="no-referrer"
-                            />
+                      {/* Barcode & Warning Alert Box */}
+                      <div className="flex flex-col sm:flex-row items-center gap-4 pt-3 border-t border-indigo-500/10">
+                        {/* Interactive Scan QR Frame */}
+                        <div className="w-24 h-24 bg-[#11132e] p-2 rounded-xl shrink-0 flex items-center justify-center border border-indigo-500/20 relative overflow-hidden shadow-inner">
+                          {depositNetwork === 'TRC20' ? (
+                            systemSettings.usdtTrc20QrCode ? (
+                              <img 
+                                src={systemSettings.usdtTrc20QrCode} 
+                                alt="USDT TRC20 QR"
+                                className="w-full h-full object-contain rounded-lg"
+                                referrerPolicy="no-referrer"
+                              />
+                            ) : systemSettings.usdtTrc20Address ? (
+                              <img 
+                                src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(systemSettings.usdtTrc20Address)}`} 
+                                alt="USDT TRC20 QR"
+                                className="w-full h-full object-contain rounded-lg"
+                                referrerPolicy="no-referrer"
+                              />
+                            ) : (
+                              <div className="text-[8px] text-indigo-400/50 text-center font-sans">No QR</div>
+                            )
                           ) : (
-                            <div className="text-[9px] text-indigo-300/60 text-center font-sans">No QR</div>
-                          )
-                        ) : (
-                          systemSettings.usdtBep20QrCode ? (
-                            <img 
-                              src={systemSettings.usdtBep20QrCode} 
-                              alt="USDT BEP20 QR"
-                              className="w-full h-full object-contain"
-                              referrerPolicy="no-referrer"
-                            />
-                          ) : systemSettings.usdtBep20Address ? (
-                            <img 
-                              src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(systemSettings.usdtBep20Address)}`} 
-                              alt="USDT BEP20 QR"
-                              className="w-full h-full object-contain"
-                              referrerPolicy="no-referrer"
-                            />
-                          ) : (
-                            <div className="text-[9px] text-indigo-300/60 text-center font-sans">No QR</div>
-                          )
-                        )}
-                      </div>
-                      <div className="space-y-1.5 text-center sm:text-left">
-                        <span className="font-bold text-amber-400 block uppercase text-[10px] tracking-wider font-sans">
-                          {systemSettings.scanGateTitle || 'Secure Barcode Scanning'}
-                        </span>
-                        <span className="text-[10px] text-indigo-200 leading-relaxed block font-sans">
-                          {systemSettings.scanGateSubtitle || 'Please send funds strictly using the matching chain. Assets sent on wrong chains are lost permanently.'}
-                        </span>
-                      </div>
-                    </div>
+                            systemSettings.usdtBep20QrCode ? (
+                              <img 
+                                src={systemSettings.usdtBep20QrCode} 
+                                alt="USDT BEP20 QR"
+                                className="w-full h-full object-contain rounded-lg"
+                                referrerPolicy="no-referrer"
+                              />
+                            ) : systemSettings.usdtBep20Address ? (
+                              <img 
+                                src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(systemSettings.usdtBep20Address)}`} 
+                                alt="USDT BEP20 QR"
+                                className="w-full h-full object-contain rounded-lg"
+                                referrerPolicy="no-referrer"
+                              />
+                            ) : (
+                              <div className="text-[8px] text-indigo-400/50 text-center font-sans">No QR</div>
+                            )
+                          )}
+                        </div>
 
+                        {/* Safety Guidelines */}
+                        <div className="space-y-1.5 text-center sm:text-left flex-1 min-w-0">
+                          <span className="font-extrabold text-amber-400 block uppercase text-[10px] tracking-wider font-sans">
+                            {systemSettings.scanGateTitle || '⚠️ Safety Chain Match Warning'}
+                          </span>
+                          <span className="text-[10px] text-indigo-200/90 leading-relaxed block font-sans">
+                            {systemSettings.scanGateSubtitle || 'Please transfer USDT strictly using the selected chain. Assets sent on wrong chains are lost permanently.'}
+                          </span>
+                        </div>
+                      </div>
+
+                    </div>
                   </div>
 
-                  {/* Transaction ID Hash submission */}
-                  <div className="space-y-2 font-mono">
-                    <span className="text-[10px] text-indigo-300 uppercase font-extrabold tracking-wider block">
-                      3. Transaction Hash (TxID) <span className="text-amber-400 font-bold text-[8.5px] ml-1 uppercase">(Auto-filled from Screenshot below)</span>
-                    </span>
-                    <input 
-                      type="text"
-                      required
-                      value={depositHashInput}
-                      onChange={(e) => setDepositHashInput(e.target.value)}
-                      placeholder="Paste your transaction hash string here..."
-                      className="w-full bg-[#060819] border border-indigo-500/30 rounded-xl p-3 text-xs text-white font-mono focus:outline-none focus:border-indigo-400 shadow-2xs transition-all"
-                    />
-                  </div>
-
-                  {/* Interactive proof of payment slip uploader */}
-                  <div className="space-y-2 font-mono text-[10px]">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] text-indigo-300 uppercase font-extrabold tracking-wider block">
-                        4. Receipt Proof Screenshot <span className="text-rose-400 font-extrabold text-[9px] ml-1 bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 rounded-md uppercase tracking-wide">COMPULSORY / compulsory</span>
+                  {/* STEP 2: UPLOAD TRANSACTION PROOF SCREENSHOT */}
+                  <div className="bg-[#11132e]/50 border border-indigo-500/15 rounded-2xl p-4 sm:p-5 space-y-3 shadow-2xs">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] bg-indigo-600 text-white font-extrabold w-5 h-5 rounded-md flex items-center justify-center shrink-0">2</span>
+                      <span className="text-[10px] sm:text-[11px] text-slate-100 font-extrabold uppercase tracking-wider block font-sans leading-tight">
+                        Upload Payment Screenshot
                       </span>
                     </div>
-                    
+
                     {/* Hidden Native File Input */}
                     <input 
                       type="file"
@@ -2858,39 +2807,39 @@ ${activeViewDoc.project.description}`
                       className="hidden"
                     />
 
+                    {/* Interactive Dropzone */}
                     <div 
                       onClick={() => {
                         if (!isAnalyzingReceipt) {
                           fileInputRef.current?.click();
                         }
                       }}
-                      className="border-2 border-dashed border-rose-500/30 hover:border-indigo-500/60 bg-[#13163a]/40 hover:bg-[#13163a]/75 p-6 rounded-2xl text-center space-y-2.5 cursor-pointer transition-all duration-200 relative overflow-hidden shadow-2xs"
+                      className="border-2 border-dashed border-rose-500/30 hover:border-indigo-500/50 bg-[#13163a]/25 hover:bg-[#13163a]/45 p-4.5 rounded-xl text-center space-y-2 cursor-pointer transition-all duration-200 relative overflow-hidden"
                     >
                       {isAnalyzingReceipt ? (
-                        <div className="py-3 space-y-3 flex flex-col items-center justify-center">
-                          <RefreshCw className="w-6 h-6 text-indigo-400 animate-spin" />
-                          <div className="space-y-1">
-                            <span className="text-[10px] text-white font-extrabold block uppercase tracking-wider animate-pulse">Analyzing Payment Receipt...</span>
-                            <p className="text-[8px] text-indigo-200/70 block font-sans">Scanning screenshot for TXID, chain, and quantity validation</p>
+                        <div className="py-2 space-y-2 flex flex-col items-center justify-center">
+                          <RefreshCw className="w-5 h-5 text-indigo-400 animate-spin" />
+                          <div className="space-y-0.5">
+                            <span className="text-[10px] text-white font-extrabold block uppercase tracking-wider animate-pulse">Scanning Receipt...</span>
+                            <p className="text-[8px] text-indigo-300/80 font-sans">Extracting details automatically</p>
                           </div>
                         </div>
                       ) : (
                         <div className="flex flex-col items-center justify-center space-y-1.5 py-1">
                           <Upload className="w-5.5 h-5.5 text-rose-400" />
-                          <div>
+                          <div className="space-y-0.5">
                             {depositProofInput ? (
-                              <div className="space-y-1.5">
-                                <span className="text-[10px] text-emerald-400 font-bold block">✓ {depositProofInput}</span>
-                                <span className="text-[8.5px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 px-2.5 py-0.5 rounded-md uppercase font-bold inline-block">Audit-ready receipt attached</span>
+                              <div className="space-y-1">
+                                <span className="text-[10px] text-emerald-400 font-bold block max-w-[220px] truncate mx-auto">✓ {depositProofInput}</span>
+                                <span className="text-[8px] text-emerald-400 bg-emerald-500/15 border border-emerald-500/25 px-2 py-0.5 rounded uppercase font-black inline-block">Proof Attached</span>
                               </div>
                             ) : (
-                              <>
-                                <span className="text-[11px] text-rose-300 font-bold block font-sans uppercase">⚠️ UPLOAD TRANSACTION SCREENSHOT (COMPULSORY)</span>
-                                <p className="text-[8.5px] text-indigo-200 block font-sans leading-relaxed mt-1">
-                                  Select or drag any exchange or wallet screenshot to auto-fetch transaction details.<br />
-                                  <span className="text-emerald-400 font-extrabold text-[8.5px] uppercase">✨ AI will automatically fetch TxID & amount so you don't have to fill them manually!</span>
+                              <div className="space-y-0.5">
+                                <span className="text-[10px] text-rose-300 font-bold block font-sans uppercase">Upload Screenshot *</span>
+                                <p className="text-[8px] text-indigo-300/80 font-sans leading-relaxed">
+                                  Drag and drop or tap to attach your receipt image
                                 </p>
-                              </>
+                              </div>
                             )}
                           </div>
                         </div>
@@ -2898,12 +2847,96 @@ ${activeViewDoc.project.description}`
                     </div>
                   </div>
 
+                  {/* STEP 3: CONFIRM EXTRACTED DETAILS & VERIFY */}
+                  <div className="bg-[#11132e]/50 border border-indigo-500/15 rounded-2xl p-4 sm:p-5 space-y-3.5 shadow-2xs">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] bg-indigo-600 text-white font-extrabold w-5 h-5 rounded-md flex items-center justify-center shrink-0">3</span>
+                      <span className="text-[10px] sm:text-[11px] text-slate-100 font-extrabold uppercase tracking-wider block font-sans leading-tight">
+                        Verify Extracted Details
+                      </span>
+                    </div>
+
+                    {/* Step 3 description */}
+                    <p className="text-[8.5px] text-indigo-300 font-sans leading-relaxed">
+                      Confirm the values below extracted from your uploaded receipt. Audit approval relies strictly on matching transaction evidence.
+                    </p>
+
+                    {/* Amount & Shares Row */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                      {/* Amount display */}
+                      <div className="space-y-1.5 text-left">
+                        <span className="text-[9px] text-indigo-300 uppercase font-bold tracking-wider block font-sans">
+                          Extracted Amount (USDT)
+                        </span>
+                        <div className="relative">
+                          <span className="absolute left-3.5 top-3 text-indigo-300 font-extrabold text-xs">$</span>
+                          <input 
+                            type="number"
+                            required
+                            readOnly
+                            placeholder="Auto-fills from Receipt..."
+                            value={depositAmount || ''}
+                            className="w-full bg-[#060819] border border-indigo-500/20 rounded-xl py-3 pl-7 pr-8 text-[10px] sm:text-xs placeholder:text-[10px] sm:placeholder:text-xs text-indigo-200 font-extrabold cursor-not-allowed shadow-2xs"
+                          />
+                          <span className="absolute right-3.5 top-3 text-indigo-400">
+                            <Lock className="w-3.5 h-3.5" />
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Estimated Shares */}
+                      <div className="space-y-1.5 text-left">
+                        <span className="text-[9px] text-indigo-300 uppercase font-bold tracking-wider block font-sans">
+                          Estimated Shares
+                        </span>
+                        <div className="bg-[#060819] border border-indigo-500/20 rounded-xl px-3.5 py-2.5 h-[38px] flex items-center justify-between text-xs text-white">
+                          <span className="font-extrabold text-emerald-400 font-mono">
+                            {(depositAmount / 113).toFixed(2)} Shares
+                          </span>
+                          <span className="text-[8px] text-indigo-400 font-mono uppercase bg-indigo-500/10 border border-indigo-500/20 px-1.5 py-0.5 rounded-sm">
+                            $113 per share
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Limit info banner */}
+                    <div className="bg-[#060819]/40 border border-amber-500/20 rounded-xl py-2.5 px-3 text-center text-[9.5px] font-sans text-indigo-200 space-y-1">
+                      <div className="text-amber-400 font-extrabold uppercase tracking-wider text-center">DEPOSIT</div> 
+                      <div className="text-center font-medium">
+                        Min: <span className="text-white font-extrabold">$10 USDT</span> | Max: <span className="text-white font-extrabold">Unlimited</span>
+                      </div>
+                    </div>
+
+                    {/* Transaction Hash / TxID Input */}
+                    <div className="space-y-1.5 text-left pt-1">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[9px] text-indigo-300 uppercase font-bold tracking-wider block font-sans">
+                          Transaction Hash (TxID)
+                        </span>
+                      </div>
+                      <div className="relative">
+                        <input 
+                          type="text"
+                          required
+                          readOnly
+                          value={depositHashInput}
+                          placeholder="Auto-fills from Receipt..."
+                          className="w-full bg-[#060819]/60 border border-indigo-500/20 rounded-xl p-3 pr-10 text-[10px] sm:text-xs placeholder:text-[10px] sm:placeholder:text-xs text-indigo-200 font-mono cursor-not-allowed shadow-2xs"
+                        />
+                        <span className="absolute right-3.5 top-3 text-indigo-400">
+                          <Lock className="w-3.5 h-3.5" />
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* SUBMISSION ACTION */}
                   <button
                     type="submit"
-                    className="w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-600 border border-emerald-400 text-white font-sans font-bold uppercase rounded-xl text-xs tracking-wider transition-all shadow-md active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2"
+                    className="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-600 border border-emerald-400 text-white font-sans font-extrabold uppercase rounded-xl text-xs tracking-wider transition-all shadow-lg hover:shadow-emerald-500/20 active:scale-[0.99] cursor-pointer flex items-center justify-center"
                   >
-                    <span>🚀</span>
-                    <span>Dispatch Receipt for Audit Verification</span>
+                    <span>Submit Deposit</span>
                   </button>
 
                 </form>

@@ -26,8 +26,8 @@ export default async function handler(req: any, res: any) {
     });
   }
 
-  const resendApiKey = (process.env.VITE_RESEND_API_KEY || "").trim();
-  const resendFromEmail = (process.env.VITE_RESEND_FROM_EMAIL || "no-reply@fundora.one").trim();
+  const resendApiKey = (process.env.RESEND_API_KEY || process.env.VITE_RESEND_API_KEY || "").trim();
+  const resendFromEmail = (process.env.RESEND_FROM_EMAIL || process.env.VITE_RESEND_FROM_EMAIL || "no-reply@fundora.one").trim();
 
   if (!resendApiKey) {
     console.error("Resend API key is not configured in Vercel environment variables.");

@@ -23,19 +23,20 @@ const EMAILJS_PUBLIC_KEY = (import.meta.env.VITE_EMAILJS_PUBLIC_KEY || '').trim(
 // Resend API (Completely free, branding-free, custom-domain transactional mail)
 const RESEND_API_KEY = (import.meta.env.VITE_RESEND_API_KEY || '').trim();
 const RESEND_FROM_EMAIL = (import.meta.env.VITE_RESEND_FROM_EMAIL || 'no-reply@fundora.one').trim();
+const EMAIL_SERVICE_ACTIVE = (import.meta.env.VITE_EMAIL_SERVICE_ACTIVE || '').trim().toLowerCase() === 'true';
 
 /**
  * Checks if any email service (EmailJS or Resend) is properly configured
  */
 export const isEmailServiceConfigured = (): boolean => {
-  return !!(RESEND_API_KEY || (EMAILJS_SERVICE_ID && EMAILJS_TEMPLATE_ID && EMAILJS_PUBLIC_KEY));
+  return EMAIL_SERVICE_ACTIVE || !!(RESEND_API_KEY || (EMAILJS_SERVICE_ID && EMAILJS_TEMPLATE_ID && EMAILJS_PUBLIC_KEY));
 };
 
 /**
  * Returns which service is currently active
  */
 export const getActiveEmailService = (): 'resend' | 'emailjs' | 'none' => {
-  if (RESEND_API_KEY) return 'resend';
+  if (EMAIL_SERVICE_ACTIVE || RESEND_API_KEY) return 'resend';
   if (EMAILJS_SERVICE_ID && EMAILJS_TEMPLATE_ID && EMAILJS_PUBLIC_KEY) return 'emailjs';
   return 'none';
 };
@@ -56,11 +57,11 @@ export const sendOtpEmail = async (params: EmailParams): Promise<{ success: bool
   }
 
   // OPTION 1: RESEND API (Zero branding, completely free with custom domains)
-  if (RESEND_API_KEY) {
-    console.log(`[Email Service] Resend is configured on client. Attempting to deliver premium OTP to ${toEmail}...`);
+  if (EMAIL_SERVICE_ACTIVE || RESEND_API_KEY) {
+    console.log(`[Email Service] Resend is configured. Attempting to deliver premium OTP to ${toEmail}...`);
     let proxyFailed = false;
 
-    // First, try the proxy server route (Express backend)
+    // First, try the proxy server route (Express backend or Vercel serverless function /api/send-otp)
     try {
       const response = await fetch('/api/send-otp', {
         method: 'POST',
@@ -87,8 +88,8 @@ export const sendOtpEmail = async (params: EmailParams): Promise<{ success: bool
       proxyFailed = true;
     }
 
-    // Direct Resend API dispatch from client-side fallback (if proxy is unreachable/fails)
-    if (proxyFailed) {
+    // Direct Resend API dispatch from client-side fallback (if proxy is unreachable/fails AND client key is set)
+    if (proxyFailed && RESEND_API_KEY) {
       try {
         const htmlContent = `<!DOCTYPE html>
 <html>
@@ -161,6 +162,11 @@ Fundora
           error: `Resend Connection Failed: ${err.message || 'Network error'}. Please verify your network and make sure VITE_RESEND_API_KEY is properly added in Vercel settings.` 
         };
       }
+    } else if (proxyFailed) {
+      return {
+        success: false,
+        error: `Resend delivery failed. Please verify that the RESEND_API_KEY environment variable is configured correctly in your Vercel project dashboard.`
+      };
     }
   }
 
