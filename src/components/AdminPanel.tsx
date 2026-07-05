@@ -4,11 +4,11 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { RealEstateProject, Transaction, UserAccount, SecurityLog, ProjectCategory, SystemSettings } from '../types';
+import { RealEstateProject, Transaction, UserAccount, SecurityLog, ProjectCategory, SystemSettings, Inquiry } from '../types';
 import { 
   Shield, Users, Landmark, Coins, FileText, Check, X, ShieldAlert,
   ArrowDownCircle, ArrowUpCircle, Plus, Eye, RefreshCw, Key, AlertOctagon, BarChart2,
-  Unlock, Minus, Wallet, User, Lock
+  Unlock, Minus, Wallet, User, Lock, Mail, MessageSquare, CheckCircle
 } from 'lucide-react';
 
 interface AdminPanelProps {
@@ -16,8 +16,9 @@ interface AdminPanelProps {
   transactions: Transaction[];
   usersList: UserAccount[];
   securityLogs: SecurityLog[];
-  activeAdminTab?: 'stats' | 'deposits' | 'withdrawals' | 'projects' | 'users' | 'security';
-  setActiveAdminTab?: (tab: 'stats' | 'deposits' | 'withdrawals' | 'projects' | 'users' | 'security') => void;
+  inquiries: Inquiry[];
+  activeAdminTab?: 'stats' | 'deposits' | 'withdrawals' | 'projects' | 'users' | 'security' | 'inquiries';
+  setActiveAdminTab?: (tab: 'stats' | 'deposits' | 'withdrawals' | 'projects' | 'users' | 'security' | 'inquiries') => void;
   onBackToDashboard: () => void;
   // Admin dynamic controllers
   onApproveTransaction: (txId: string) => void;
@@ -29,6 +30,8 @@ interface AdminPanelProps {
   onUnbindUserWallet?: (userId: string, network: 'TRC20' | 'BEP20' | 'both') => void;
   onUpdateProject?: (updatedProject: RealEstateProject) => void;
   onDeleteProject?: (projectId: string) => void;
+  onUpdateInquiry?: (inquiry: Inquiry) => void;
+  onDeleteInquiry?: (id: string) => void;
   systemSettings?: SystemSettings;
   onUpdateSystemSettings?: (settings: SystemSettings) => void;
   onUpdateUser?: (userId: string, updatedFields: Partial<UserAccount>) => void;
@@ -40,6 +43,7 @@ export default function AdminPanel({
   transactions,
   usersList,
   securityLogs,
+  inquiries = [],
   activeAdminTab,
   setActiveAdminTab,
   onBackToDashboard,
@@ -52,6 +56,8 @@ export default function AdminPanel({
   onUnbindUserWallet,
   onUpdateProject,
   onDeleteProject,
+  onUpdateInquiry,
+  onDeleteInquiry,
   systemSettings = {
     id: 'default',
     usdtTrc20Address: 'TX1h2A9eFm7xKsZ8Jq9wDpBcNdKyLmTqRy',
@@ -65,7 +71,7 @@ export default function AdminPanel({
   onUpdateUser,
   currentUser
 }: AdminPanelProps) {
-  const [localAdminTab, setLocalAdminTab] = useState<'stats' | 'deposits' | 'withdrawals' | 'projects' | 'users' | 'security' | 'settings'>('stats');
+  const [localAdminTab, setLocalAdminTab] = useState<'stats' | 'deposits' | 'withdrawals' | 'projects' | 'users' | 'security' | 'settings' | 'inquiries'>('stats');
 
   const adminTab = activeAdminTab !== undefined ? activeAdminTab : localAdminTab;
   const setAdminTab = setActiveAdminTab !== undefined ? (setActiveAdminTab as any) : setLocalAdminTab;
@@ -211,6 +217,8 @@ export default function AdminPanel({
   // User Management State
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [adjustAmount, setAdjustAmount] = useState<number>(50);
+  const [zoomedKycUrl, setZoomedKycUrl] = useState<string | null>(null);
+  const [zoomedKycName, setZoomedKycName] = useState<string>('');
 
   // Preset listing images
   const PRESET_PROPERTY_IMAGES = [
@@ -481,6 +489,7 @@ export default function AdminPanel({
           { id: 'projects', label: '🏢 Projects Desk' },
           { id: 'users', label: '👥 User Ledgers' },
           { id: 'security', label: '🛡️ Security Desk' },
+          { id: 'inquiries', label: `📬 Inquiries (${inquiries.filter(i => i.status === 'Pending').length})` },
           { id: 'settings', label: '⚙️ Scan Gate' }
         ].map((tab) => (
           <button
@@ -1563,7 +1572,7 @@ export default function AdminPanel({
 
                                   <div className="space-y-1.5 pb-2.5 border-b border-slate-850">
                                     <span className="text-[9px] uppercase font-mono text-slate-500 block">KYC Verification Details</span>
-                                    <div className="bg-slate-950/40 p-2 rounded border border-slate-850 space-y-1 text-[11px]">
+                                    <div className="bg-slate-950/40 p-2.5 rounded border border-slate-850 space-y-1.5 text-[11px]">
                                       <div className="flex justify-between">
                                         <span className="text-slate-500">Full Name:</span>
                                         <span className="text-white font-semibold">{usr.kycFullName || usr.name || 'Not provided'}</span>
@@ -1576,12 +1585,84 @@ export default function AdminPanel({
                                         <span className="text-slate-500">Doc Type:</span>
                                         <span className="text-white">{usr.kycDocumentType || 'Not provided'}</span>
                                       </div>
-                                      <div className="flex justify-between">
+                                      <div className="flex justify-between pb-1.5 border-b border-slate-900/60">
                                         <span className="text-slate-500">KYC Status:</span>
                                         <span className={`font-bold ${
                                           usr.kycStatus === 'Verified' ? 'text-emerald-400' :
                                           usr.kycStatus === 'Under Review' ? 'text-amber-400' : 'text-slate-400'
                                         }`}>{usr.kycStatus || 'Unverified'}</span>
+                                      </div>
+
+                                      {/* Attachment viewer inside the details box */}
+                                      <div className="pt-1.5">
+                                        <span className="text-[9px] uppercase font-mono text-slate-500 block mb-1">Uploaded Attachment:</span>
+                                        {usr.kycDocumentUrl ? (
+                                          usr.kycDocumentUrl.startsWith('data:image/') ? (
+                                            <div className="space-y-1.5">
+                                              <div className="relative group overflow-hidden rounded-lg border border-slate-800 bg-slate-950 p-1 flex items-center justify-center">
+                                                <img 
+                                                  src={usr.kycDocumentUrl} 
+                                                  alt="KYC Document Preview" 
+                                                  className="max-h-[140px] max-w-full rounded object-contain transition-transform group-hover:scale-[1.03]" 
+                                                />
+                                                <div className="absolute inset-0 bg-slate-950/80 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center gap-1.5 transition-opacity duration-200">
+                                                  <button
+                                                    onClick={() => {
+                                                      setZoomedKycUrl(usr.kycDocumentUrl || null);
+                                                      setZoomedKycName(usr.kycFullName || usr.name || 'KYC Document');
+                                                    }}
+                                                    className="px-2 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded font-mono text-[9px] font-bold shadow transition-colors cursor-pointer"
+                                                  >
+                                                    🔍 View Zoomed
+                                                  </button>
+                                                  <a 
+                                                    href={usr.kycDocumentUrl} 
+                                                    download={usr.kycDocumentFileName || "kyc-document"}
+                                                    className="px-2 py-1 bg-emerald-600 hover:bg-emerald-500 text-slate-950 rounded font-mono text-[9px] font-bold shadow transition-colors cursor-pointer"
+                                                  >
+                                                    📥 Download
+                                                  </a>
+                                                </div>
+                                              </div>
+                                              <div className="flex justify-between items-center text-[9px] font-mono text-slate-400 px-1">
+                                                <span className="truncate max-w-[120px]" title={usr.kycDocumentFileName || "Attached image"}>
+                                                  📄 {usr.kycDocumentFileName || "Attached Image"}
+                                                </span>
+                                                <button
+                                                  onClick={() => {
+                                                    setZoomedKycUrl(usr.kycDocumentUrl || null);
+                                                    setZoomedKycName(usr.kycFullName || usr.name || 'KYC Document');
+                                                  }}
+                                                  className="text-indigo-400 hover:underline cursor-pointer"
+                                                >
+                                                  Zoom Image
+                                                </button>
+                                              </div>
+                                            </div>
+                                          ) : (
+                                            <div className="bg-slate-950/80 p-2 rounded-lg border border-slate-850 flex items-center justify-between">
+                                              <div className="flex items-center gap-1.5 min-w-0">
+                                                <FileText className="w-4 h-4 text-amber-500 shrink-0" />
+                                                <div className="truncate">
+                                                  <span className="text-[10px] text-slate-300 block truncate font-mono" title={usr.kycDocumentFileName || "Attached Document"}>
+                                                    {usr.kycDocumentFileName || "Attached Document"}
+                                                  </span>
+                                                </div>
+                                              </div>
+                                              <a 
+                                                href={usr.kycDocumentUrl} 
+                                                download={usr.kycDocumentFileName || "kyc-document"}
+                                                className="px-2 py-0.5 bg-amber-500/10 hover:bg-amber-500/25 text-amber-400 rounded border border-amber-500/30 hover:border-amber-500/50 font-mono text-[9px] font-bold shrink-0 transition-all cursor-pointer"
+                                              >
+                                                Download
+                                              </a>
+                                            </div>
+                                          )
+                                        ) : (
+                                          <div className="py-2.5 text-center bg-slate-950/40 rounded-lg border border-slate-900 border-dashed">
+                                            <span className="text-[10px] font-sans text-slate-400 italic">No document file attached</span>
+                                          </div>
+                                        )}
                                       </div>
                                     </div>
 
@@ -2307,7 +2388,177 @@ export default function AdminPanel({
           </div>
         )}
 
+        {/* ==================== TAB 8: REAL-TIME INQUIRIES DESK ==================== */}
+        {adminTab === 'inquiries' && (
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+            <div className="border-b border-slate-800 pb-3 flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-red-400">📬 Real-Time Customer Inquiries</h3>
+                <p className="text-[10px] text-slate-400 font-sans mt-1">
+                  View and manage real-time contact requests, pre-sale questions, and customer support tickets submitted on the homepage.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 font-mono text-[9px] text-slate-400 bg-slate-950 p-1.5 rounded-lg border border-slate-850">
+                <span>Total: <strong className="text-white">{inquiries.length}</strong></span>
+                <span>•</span>
+                <span>Pending: <strong className="text-amber-400">{inquiries.filter(i => i.status === 'Pending').length}</strong></span>
+              </div>
+            </div>
+
+            {inquiries.length === 0 ? (
+              <div className="py-12 text-center space-y-2">
+                <div className="w-12 h-12 rounded-full bg-slate-950 flex items-center justify-center mx-auto border border-slate-800">
+                  <Mail className="w-5 h-5 text-slate-500" />
+                </div>
+                <h4 className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider">No Inquiries Found</h4>
+                <p className="text-[10px] text-slate-500 max-w-xs mx-auto">
+                  When visitors submit the "Send Quick Inquiry" form on the main homepage, they will appear here in real-time.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse min-w-[700px] md:min-w-full">
+                  <thead>
+                    <tr className="border-b border-slate-800 text-[9px] font-mono font-bold uppercase tracking-wider text-slate-400 bg-slate-950/40">
+                      <th className="py-3 px-4">Contact Details</th>
+                      <th className="py-3 px-4">Message Details</th>
+                      <th className="py-3 px-4">Submitted At</th>
+                      <th className="py-3 px-4 text-center">Status</th>
+                      <th className="py-3 px-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60 font-mono text-xs">
+                    {inquiries.map((inq) => (
+                      <tr key={inq.id} className="hover:bg-slate-950/20 transition-colors">
+                        <td className="py-3.5 px-4 space-y-1">
+                          <div className="font-sans font-bold text-white text-xs">{inq.name}</div>
+                          <div className="text-[10px] text-slate-400 flex items-center gap-1">
+                            <Mail className="w-3 h-3 text-slate-500 shrink-0" />
+                            <a href={`mailto:${inq.email}`} className="hover:text-amber-400 transition-colors">{inq.email}</a>
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <p className="text-[11px] text-slate-300 font-sans max-w-md break-words whitespace-pre-wrap leading-relaxed">
+                            {inq.message}
+                          </p>
+                        </td>
+                        <td className="py-3.5 px-4 text-[10px] text-slate-450">
+                          {inq.timestamp ? new Date(inq.timestamp).toLocaleString() : 'N/A'}
+                        </td>
+                        <td className="py-3.5 px-4 text-center">
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider ${
+                            inq.status === 'Resolved' 
+                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                              : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                          }`}>
+                            <span className={`w-1 h-1 rounded-full ${inq.status === 'Resolved' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                            {inq.status}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {inq.status === 'Pending' ? (
+                              <button
+                                onClick={() => onUpdateInquiry && onUpdateInquiry({ ...inq, status: 'Resolved' })}
+                                className="px-2 py-1 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-[9px] uppercase font-bold tracking-wider border border-emerald-500/25 transition-all cursor-pointer flex items-center gap-1"
+                                title="Mark as Resolved"
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                                <span>Resolve</span>
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => onUpdateInquiry && onUpdateInquiry({ ...inq, status: 'Pending' })}
+                                className="px-2 py-1 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 text-[9px] uppercase font-bold tracking-wider border border-amber-500/25 transition-all cursor-pointer flex items-center gap-1"
+                                title="Mark as Pending"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                                <span>Re-open</span>
+                              </button>
+                            )}
+                            <button
+                              onClick={() => {
+                                if (confirm("Are you sure you want to delete this inquiry permanently?")) {
+                                  onDeleteInquiry && onDeleteInquiry(inq.id);
+                                }
+                              }}
+                              className="px-2 py-1 rounded bg-rose-500/15 hover:bg-rose-500/25 text-rose-400 text-[9px] uppercase font-bold tracking-wider border border-rose-500/25 transition-all cursor-pointer"
+                              title="Delete permanently"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
       </div>
+
+      {/* Zoomed KYC Image Overlay Modal */}
+      {zoomedKycUrl && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4 backdrop-blur-md">
+          <div className="relative max-w-4xl w-full bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-5 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div>
+                <h4 className="text-sm font-sans font-bold text-white uppercase tracking-wider">
+                  🔍 KYC Identity Document Audit
+                </h4>
+                <p className="text-[10px] font-mono text-slate-400 mt-0.5">
+                  User Account: <strong className="text-amber-400">{zoomedKycName}</strong>
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setZoomedKycUrl(null);
+                  setZoomedKycName('');
+                }}
+                className="w-8 h-8 rounded-full bg-slate-950 border border-slate-800 hover:border-slate-600 text-slate-400 hover:text-white flex items-center justify-center font-bold text-sm transition-all cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="bg-slate-950 border border-slate-850 rounded-xl p-2 flex items-center justify-center overflow-auto max-h-[70vh]">
+              <img 
+                src={zoomedKycUrl} 
+                alt="KYC Large Document Scan" 
+                className="max-h-[60vh] max-w-full rounded object-contain" 
+                referrerPolicy="no-referrer"
+              />
+            </div>
+
+            <div className="flex justify-between items-center pt-2 font-mono text-[10px]">
+              <span className="text-slate-500">
+                Tip: Right-click image to save or open in new window
+              </span>
+              <div className="flex gap-2">
+                <a
+                  href={zoomedKycUrl}
+                  download={zoomedKycName.replace(/\s+/g, '_') + '_kyc_doc'}
+                  className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold uppercase tracking-wider text-[10px] cursor-pointer shadow transition-all"
+                >
+                  Download Original File
+                </a>
+                <button
+                  onClick={() => {
+                    setZoomedKycUrl(null);
+                    setZoomedKycName('');
+                  }}
+                  className="px-4 py-2 rounded-lg bg-slate-850 hover:bg-slate-750 text-white font-bold uppercase tracking-wider text-[10px] cursor-pointer transition-all"
+                >
+                  Close Preview
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

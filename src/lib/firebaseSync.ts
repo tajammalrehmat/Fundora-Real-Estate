@@ -29,7 +29,8 @@ import {
   InvestmentRecord, 
   ProfitClaimRecord, 
   SecurityLog,
-  SystemSettings
+  SystemSettings,
+  Inquiry
 } from '../types';
 
 // Helper to check if Firebase is correctly configured and working
@@ -328,6 +329,37 @@ export const saveSystemSettingsToFirebase = async (settings: SystemSettings) => 
     await setDoc(doc(db, 'system_settings', 'default'), settings);
   } catch (e) {
     console.error('Failed to save system settings to Firebase:', e);
+  }
+};
+
+export const loadInquiriesFromFirebase = async (): Promise<Inquiry[]> => {
+  if (!isFirebaseEnabled()) return [];
+  try {
+    const snapshot = await getDocs(collection(db, 'inquiries'));
+    if (snapshot.empty) return [];
+    const inquiries = snapshot.docs.map(d => d.data() as Inquiry);
+    return inquiries.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+  } catch (e) {
+    console.error('Error loading inquiries from Firebase:', e);
+    return [];
+  }
+};
+
+export const saveInquiryToFirebase = async (inquiry: Inquiry) => {
+  if (!isFirebaseEnabled()) return;
+  try {
+    await setDoc(doc(db, 'inquiries', inquiry.id), inquiry);
+  } catch (e) {
+    console.error('Failed to save inquiry to Firebase:', e);
+  }
+};
+
+export const deleteInquiryFromFirebase = async (id: string) => {
+  if (!isFirebaseEnabled()) return;
+  try {
+    await deleteDoc(doc(db, 'inquiries', id));
+  } catch (e) {
+    console.error('Failed to delete inquiry from Firebase:', e);
   }
 };
 

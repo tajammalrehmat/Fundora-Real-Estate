@@ -12,7 +12,7 @@ import AdminPanel from './components/AdminPanel';
 import GlobalNavbar from './components/GlobalNavbar';
 import BiometricLockScreen from './components/BiometricLockScreen';
 import AboutUs from './components/AboutUs';
-import { RealEstateProject, Transaction, UserAccount, InvestmentRecord, ProfitClaimRecord, SecurityLog, SystemSettings } from './types';
+import { RealEstateProject, Transaction, UserAccount, InvestmentRecord, ProfitClaimRecord, SecurityLog, SystemSettings, Inquiry } from './types';
 import { INITIAL_PROJECTS, INITIAL_USER, INITIAL_ADMIN, INITIAL_TRANSACTIONS, INITIAL_SECURITY_LOGS } from './data';
 import { 
   seedInitialDataIfEmpty,
@@ -31,7 +31,10 @@ import {
   deleteProjectFromFirebase,
   isFirebaseEnabled,
   loadSystemSettingsFromFirebase,
-  saveSystemSettingsToFirebase
+  saveSystemSettingsToFirebase,
+  loadInquiriesFromFirebase,
+  saveInquiryToFirebase,
+  deleteInquiryFromFirebase
 } from './lib/firebaseSync';
 
 export default function App() {
@@ -49,11 +52,15 @@ export default function App() {
   // Navigation states
   const [currentPage, setCurrentPage] = useState<'home' | 'login' | 'register' | 'forgot' | 'dashboard' | 'admin' | 'about'>('home');
   const [activeDashboardTab, setActiveDashboardTab] = useState<'overview' | 'properties' | 'wallet' | 'ledger' | 'claim' | 'referrals' | 'profile'>('overview');
-  const [activeAdminTab, setActiveAdminTab] = useState<'stats' | 'deposits' | 'withdrawals' | 'projects' | 'users' | 'security'>('stats');
+  const [activeAdminTab, setActiveAdminTab] = useState<'stats' | 'deposits' | 'withdrawals' | 'projects' | 'users' | 'security' | 'inquiries'>('stats');
   const [scrollToAnchor, setScrollToAnchor] = useState<string | null>(null);
   const [authReason, setAuthReason] = useState<string | null>(null);
 
   // Core reactive data tables (Synchronized with localStorage)
+  const [inquiriesList, setInquiriesList] = useState<Inquiry[]>(() => {
+    const saved = localStorage.getItem('inv_inquiries');
+    return saved ? JSON.parse(saved) : [];
+  });
   const [projectsList, setProjectsList] = useState<RealEstateProject[]>(() => {
     const saved = localStorage.getItem('inv_projects');
     return saved ? JSON.parse(saved) : INITIAL_PROJECTS;
@@ -446,6 +453,13 @@ export default function App() {
     }
   }, [systemSettings, isFirebaseSynced]);
 
+  useEffect(() => {
+    localStorage.setItem('inv_inquiries', JSON.stringify(inquiriesList));
+    if (isFirebaseSynced && isFirebaseEnabled() && !isInitialSyncRef.current) {
+      inquiriesList.forEach(inq => saveInquiryToFirebase(inq));
+    }
+  }, [inquiriesList, isFirebaseSynced]);
+
   // Initial boot: Seed & Load everything from Firebase!
   useEffect(() => {
     const initializeFirebaseData = async () => {
@@ -461,14 +475,15 @@ export default function App() {
 
       // Load all collections
       try {
-        const [projects, users, transactions, investments, claims, logs, settings] = await Promise.all([
+        const [projects, users, transactions, investments, claims, logs, settings, inquiries] = await Promise.all([
           loadProjectsFromFirebase(),
           loadUsersFromFirebase(),
           loadTransactionsFromFirebase(),
           loadInvestmentsFromFirebase(),
           loadClaimsFromFirebase(),
           loadSecurityLogsFromFirebase(),
-          loadSystemSettingsFromFirebase()
+          loadSystemSettingsFromFirebase(),
+          loadInquiriesFromFirebase()
         ]);
 
         let filteredProjects = projects || [];
@@ -494,6 +509,7 @@ export default function App() {
         if (claims) setClaimsHistory(claims);
         if (logs) setSecurityLogsList(logs);
         if (settings) setSystemSettings(settings);
+        if (inquiries) setInquiriesList(inquiries);
 
         // Also update active user from the fresh database if there was one saved in localStorage
         const savedActiveUser = localStorage.getItem('inv_active_user');
@@ -1187,6 +1203,37 @@ export default function App() {
     addSystemLog('Admin_Action', `Property listing ${projectId} deleted from catalog.`, 'Secure');
   };
 
+  const handleSubmitInquiry = async (name: string, email: string, message: string) => {
+    const newInquiry: Inquiry = {
+      id: `inq-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+      name,
+      email,
+      message,
+      timestamp: new Date().toISOString(),
+      status: 'Pending'
+    };
+    setInquiriesList(prev => [newInquiry, ...prev]);
+    if (isFirebaseEnabled()) {
+      await saveInquiryToFirebase(newInquiry);
+    }
+  };
+
+  const handleUpdateInquiry = async (updatedInquiry: Inquiry) => {
+    setInquiriesList(prev => prev.map(inq => inq.id === updatedInquiry.id ? updatedInquiry : inq));
+    if (isFirebaseEnabled()) {
+      await saveInquiryToFirebase(updatedInquiry);
+    }
+    addSystemLog('Admin_Action', `Inquiry from ${updatedInquiry.name} updated to ${updatedInquiry.status}.`, 'Secure');
+  };
+
+  const handleDeleteInquiry = async (id: string) => {
+    setInquiriesList(prev => prev.filter(inq => inq.id !== id));
+    if (isFirebaseEnabled()) {
+      await deleteInquiryFromFirebase(id);
+    }
+    addSystemLog('Admin_Action', `Customer inquiry ${id} deleted from databases.`, 'Secure');
+  };
+
   // Daily profit interactive Claim trigger
   const handleClaimDailyProfit = async () => {
     if (!activeUser) return { success: false, type: 'inactive_window' as const };
@@ -1515,6 +1562,7 @@ export default function App() {
           allClaims={claimsHistory}
           projects={projectsList}
           allUsers={usersListState}
+          onSubmitInquiry={handleSubmitInquiry}
         />
       )}
 
@@ -1573,6 +1621,7 @@ export default function App() {
           transactions={transactionsList}
           usersList={usersListState}
           securityLogs={securityLogsList}
+          inquiries={inquiriesList}
           activeAdminTab={activeAdminTab}
           setActiveAdminTab={setActiveAdminTab}
           onBackToDashboard={activeUser ? handleBackToDashboard : () => setCurrentPage('home')}
@@ -1585,6 +1634,8 @@ export default function App() {
           onUnbindUserWallet={handleUnbindUserWallet}
           onUpdateProject={handleUpdateProject}
           onDeleteProject={handleDeleteProject}
+          onUpdateInquiry={handleUpdateInquiry}
+          onDeleteInquiry={handleDeleteInquiry}
           systemSettings={systemSettings}
           onUpdateSystemSettings={handleUpdateSystemSettings}
           onUpdateUser={handleUpdateAnyUser}

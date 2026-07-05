@@ -1,0 +1,188 @@
+{
+  "entities": {
+    "RealEstateProject": {
+      "title": "RealEstateProject",
+      "description": "A fractional real estate project available for co-ownership",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "location": { "type": "string" },
+        "image": { "type": "string" },
+        "targetAmount": { "type": "number" },
+        "fundedAmount": { "type": "number" },
+        "minInvestment": { "type": "number" },
+        "annualYield": { "type": "number" },
+        "tokenPrice": { "type": "number" },
+        "availableTokens": { "type": "number" },
+        "totalTokens": { "type": "number" },
+        "status": { "type": "string" },
+        "description": { "type": "string" },
+        "propertyType": { "type": "string" },
+        "dividendFrequency": { "type": "string" }
+      },
+      "required": ["id", "title", "targetAmount", "fundedAmount", "tokenPrice"]
+    },
+    "UserAccount": {
+      "title": "UserAccount",
+      "description": "User profile, balance, security settings, and registration details",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string" },
+        "referralCode": { "type": "string" },
+        "balance": { "type": "number" },
+        "totalDeposited": { "type": "number" },
+        "totalWithdrawn": { "type": "number" },
+        "totalInvestment": { "type": "number" },
+        "totalProfitEarned": { "type": "number" },
+        "isEmailVerified": { "type": "boolean" },
+        "registrationDate": { "type": "string" },
+        "referredBy": { "type": "string" },
+        "webAuthnEnabled": { "type": "boolean" },
+        "kycStatus": { "type": "string" },
+        "kycFullName": { "type": "string" },
+        "kycCountry": { "type": "string" },
+        "kycDocumentType": { "type": "string" },
+        "kycDocumentUrl": { "type": "string" },
+        "kycDocumentFileName": { "type": "string" }
+      },
+      "required": ["id", "email", "name", "role", "balance"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Financial or system ledger transactions",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "type": { "type": "string" },
+        "amount": { "type": "number" },
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "status": { "type": "string" },
+        "txHash": { "type": "string" },
+        "blockchain": { "type": "string" },
+        "description": { "type": "string" }
+      },
+      "required": ["id", "userId", "type", "amount", "date", "status"]
+    },
+    "InvestmentRecord": {
+      "title": "InvestmentRecord",
+      "description": "An active co-ownership investment record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "projectId": { "type": "string" },
+        "projectName": { "type": "string" },
+        "sharesPurchased": { "type": "number" },
+        "totalCost": { "type": "number" },
+        "purchaseDate": { "type": "string" },
+        "dailyProfitRate": { "type": "number" },
+        "durationMonths": { "type": "number" },
+        "remainingMonths": { "type": "number" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "userId", "projectId", "sharesPurchased", "totalCost"]
+    },
+    "ProfitClaimRecord": {
+      "title": "ProfitClaimRecord",
+      "description": "A daily profit claim or automatic rollover history",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "date": { "type": "string" },
+        "amount": { "type": "number" },
+        "status": { "type": "string" },
+        "claimedAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "date", "amount", "status"]
+    },
+    "SecurityLog": {
+      "title": "SecurityLog",
+      "description": "Audit security logs for session locks and authentications",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "type": { "type": "string" },
+        "description": { "type": "string" },
+        "ipAddress": { "type": "string" },
+        "status": { "type": "string" },
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" }
+      },
+      "required": ["id", "timestamp", "type", "description", "status"]
+    },
+    "SystemSettings": {
+      "title": "SystemSettings",
+      "description": "Global administrator variables for gateway wallet addresses",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "usdtTrc20Address": { "type": "string" },
+        "usdtBep20Address": { "type": "string" },
+        "scanGateTitle": { "type": "string" },
+        "scanGateSubtitle": { "type": "string" },
+        "usdtTrc20QrCode": { "type": "string" },
+        "usdtBep20QrCode": { "type": "string" }
+      },
+      "required": ["id", "usdtTrc20Address", "usdtBep20Address"]
+    },
+    "Inquiry": {
+      "title": "Inquiry",
+      "description": "Real-time user inquiries submitted via the platform landing page",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "message": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "name", "email", "message", "timestamp", "status"]
+    }
+  },
+  "firestore": {
+    "projects": {
+      "schema": "RealEstateProject",
+      "description": "Active investment property listings"
+    },
+    "users": {
+      "schema": "UserAccount",
+      "description": "User profiles and financial balances"
+    },
+    "transactions": {
+      "schema": "Transaction",
+      "description": "Financial ledger deposits and withdrawals"
+    },
+    "investments": {
+      "schema": "InvestmentRecord",
+      "description": "Fractional title token co-ownership contracts"
+    },
+    "claims": {
+      "schema": "ProfitClaimRecord",
+      "description": "Earnings claims records"
+    },
+    "security_logs": {
+      "schema": "SecurityLog",
+      "description": "Biometrics and auth logs"
+    },
+    "system_settings": {
+      "schema": "SystemSettings",
+      "description": "Platform global variables"
+    },
+    "inquiries": {
+      "schema": "Inquiry",
+      "description": "Pre-sale and general property inquiries"
+    }
+  }
+}

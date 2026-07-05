@@ -80,6 +80,8 @@ export interface UserAccount {
   kycFullName?: string;
   kycCountry?: string;
   kycDocumentType?: string;
+  kycDocumentUrl?: string;
+  kycDocumentFileName?: string;
   password?: string;
   webAuthnEnabled?: boolean;
   webAuthnCredentialId?: string;
@@ -276,5 +278,14 @@ export interface SystemSettings {
   scanGateSubtitle: string;
   usdtTrc20QrCode?: string;
   usdtBep20QrCode?: string;
+}
+
+export interface Inquiry {
+  id: string;
+  name: string;
+  email: string;
+  message: string;
+  timestamp: string;
+  status: 'Pending' | 'Resolved';
 }
 

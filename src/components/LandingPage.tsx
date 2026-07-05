@@ -22,6 +22,7 @@ interface LandingPageProps {
   allClaims?: ProfitClaimRecord[];
   projects?: RealEstateProject[];
   allUsers?: UserAccount[];
+  onSubmitInquiry?: (name: string, email: string, message: string) => Promise<void>;
 }
 
 export default function LandingPage({ 
@@ -31,7 +32,8 @@ export default function LandingPage({
   allTransactions = [],
   allClaims = [],
   projects = INITIAL_PROJECTS,
-  allUsers = []
+  allUsers = [],
+  onSubmitInquiry
 }: LandingPageProps) {
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -172,6 +174,7 @@ export default function LandingPage({
   const handleVerifyLedgerId = (e: React.FormEvent) => {
     e.preventDefault();
   };
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [contactForm, setContactForm] = useState({
     name: '',
     email: '',
@@ -179,13 +182,29 @@ export default function LandingPage({
     submitted: false
   });
 
-  const handleContactSubmit = (e: React.FormEvent) => {
+  const handleContactSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setContactForm(prev => ({ ...prev, submitted: true }));
-    setTimeout(() => {
-      setContactForm(prev => ({ ...prev, name: '', email: '', message: '', submitted: false }));
-      alert("Demo Info: Your inquiry has been logged securely under transaction compliance logs.");
-    }, 2000);
+    if (!contactForm.name || !contactForm.email || !contactForm.message) {
+      alert("Please fill in all inquiry form fields.");
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      if (onSubmitInquiry) {
+        await onSubmitInquiry(contactForm.name, contactForm.email, contactForm.message);
+      }
+      setContactForm({
+        name: '',
+        email: '',
+        message: '',
+        submitted: true
+      });
+    } catch (err) {
+      console.error(err);
+      alert("Failed to submit inquiry. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -812,51 +831,83 @@ export default function LandingPage({
               <span>Send Quick Inquiry</span>
             </h3>
 
-            <form onSubmit={handleContactSubmit} className="space-y-4">
-              <div className="space-y-1">
-                <label className="block text-[10px] uppercase font-mono font-bold text-slate-400">Full Name</label>
-                <input 
-                  type="text" 
-                  required
-                  value={contactForm.name}
-                  onChange={(e) => setContactForm(prev => ({ ...prev, name: e.target.value }))}
-                  placeholder="e.g. Oliver Davies"
-                  className="w-full bg-slate-950/80 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-100 focus:outline-none focus:border-amber-500"
-                />
+            {contactForm.submitted ? (
+              <div className="bg-emerald-500/10 border border-emerald-500/20 p-5 rounded-xl text-center space-y-3">
+                <div className="w-10 h-10 rounded-full bg-emerald-500/15 flex items-center justify-center mx-auto text-emerald-400">
+                  <CheckCircle className="w-5 h-5" />
+                </div>
+                <h4 className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-wider">Inquiry Dispatched</h4>
+                <p className="text-[10px] text-slate-300 leading-relaxed font-sans">
+                  Your request has been logged and synchronized in real-time with the admin secure dashboard. Our representative will contact you shortly.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setContactForm(prev => ({ ...prev, submitted: false }))}
+                  className="mt-2 text-[10px] text-amber-400 underline hover:text-amber-300"
+                >
+                  Send another inquiry
+                </button>
               </div>
+            ) : (
+              <form onSubmit={handleContactSubmit} className="space-y-4">
+                <div className="space-y-1">
+                  <label className="block text-[10px] uppercase font-mono font-bold text-slate-400">Full Name</label>
+                  <input 
+                    type="text" 
+                    required
+                    disabled={isSubmitting}
+                    value={contactForm.name}
+                    onChange={(e) => setContactForm(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="e.g. Oliver Davies"
+                    className="w-full bg-slate-950/80 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-100 focus:outline-none focus:border-amber-500 disabled:opacity-50"
+                  />
+                </div>
 
-              <div className="space-y-1">
-                <label className="block text-[10px] uppercase font-mono font-bold text-slate-400">Email Address</label>
-                <input 
-                  type="email" 
-                  required
-                  value={contactForm.email}
-                  onChange={(e) => setContactForm(prev => ({ ...prev, email: e.target.value }))}
-                  placeholder="e.g. oliver.davies@outlook.co.uk"
-                  className="w-full bg-slate-950/80 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-100 focus:outline-none focus:border-amber-500"
-                />
-              </div>
+                <div className="space-y-1">
+                  <label className="block text-[10px] uppercase font-mono font-bold text-slate-400">Email Address</label>
+                  <input 
+                    type="email" 
+                    required
+                    disabled={isSubmitting}
+                    value={contactForm.email}
+                    onChange={(e) => setContactForm(prev => ({ ...prev, email: e.target.value }))}
+                    placeholder="e.g. oliver.davies@outlook.co.uk"
+                    className="w-full bg-slate-950/80 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-100 focus:outline-none focus:border-amber-500 disabled:opacity-50"
+                  />
+                </div>
 
-              <div className="space-y-1">
-                <label className="block text-[10px] uppercase font-mono font-bold text-slate-400">Inquiry Details</label>
-                <textarea 
-                  required
-                  rows={3}
-                  value={contactForm.message}
-                  onChange={(e) => setContactForm(prev => ({ ...prev, message: e.target.value }))}
-                  placeholder="Describe your interest or ask about corporate yield options..."
-                  className="w-full bg-slate-950/80 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-100 focus:outline-none focus:border-amber-500"
-                ></textarea>
-              </div>
+                <div className="space-y-1">
+                  <label className="block text-[10px] uppercase font-mono font-bold text-slate-400">Inquiry Details</label>
+                  <textarea 
+                    required
+                    rows={3}
+                    disabled={isSubmitting}
+                    value={contactForm.message}
+                    onChange={(e) => setContactForm(prev => ({ ...prev, message: e.target.value }))}
+                    placeholder="Describe your interest or ask about corporate yield options..."
+                    className="w-full bg-slate-950/80 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-100 focus:outline-none focus:border-amber-500 disabled:opacity-50"
+                  ></textarea>
+                </div>
 
-              <button 
-                type="submit"
-                className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold rounded-lg text-xs tracking-wider uppercase flex items-center justify-center gap-2"
-              >
-                <span>Submit Inquiry</span>
-                <Send className="w-3.5 h-3.5" />
-              </button>
-            </form>
+                <button 
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-500/50 text-slate-950 font-bold rounded-lg text-xs tracking-wider uppercase flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed transition-all"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <span>Sending...</span>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    </>
+                  ) : (
+                    <>
+                      <span>Submit Inquiry</span>
+                      <Send className="w-3.5 h-3.5" />
+                    </>
+                  )}
+                </button>
+              </form>
+            )}
           </div>
         </div>
       </section>

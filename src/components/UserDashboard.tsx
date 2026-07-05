@@ -444,16 +444,12 @@ export default function UserDashboard({
     const sizeInMB = file.size / (1024 * 1024);
     setKycFileSize(`${sizeInMB.toFixed(2)} MB`);
 
-    // Create a local URL/DataURL for image previews
-    if (file.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setKycFilePreview(e.target?.result as string);
-      };
-      reader.readAsDataURL(file);
-    } else {
-      setKycFilePreview(null); // Clear image preview for PDFs/Docs
-    }
+    // Create a local URL/DataURL for document storage and image previews
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setKycFilePreview(e.target?.result as string);
+    };
+    reader.readAsDataURL(file);
   };
 
   const triggerCopy = (text: string, label: string) => {
@@ -4256,13 +4252,13 @@ ${activeViewDoc.project.description}`
                       >
                         {kycFileName ? (
                           <>
-                            {kycFilePreview ? (
+                            {kycFilePreview && kycFilePreview.startsWith('data:image/') ? (
                               <div className="relative w-16 h-16 rounded-lg overflow-hidden border border-[#13163a] shadow-sm mb-1">
                                 <img src={kycFilePreview} alt="Doc Preview" className="w-full h-full object-cover" />
                               </div>
                             ) : (
-                              <div className="w-10 h-10 bg-emerald-500/20 rounded-full flex items-center justify-center text-emerald-400 animate-pulse">
-                                <CheckCircle2 className="w-6 h-6" />
+                              <div className="w-10 h-10 bg-emerald-500/20 rounded-full flex items-center justify-center text-emerald-400 mb-1">
+                                <FileText className="w-5 h-5 text-emerald-400" />
                               </div>
                             )}
                             <div className="space-y-0.5">
@@ -4307,7 +4303,9 @@ ${activeViewDoc.project.description}`
                         kycStatus: 'Under Review',
                         kycFullName: kycFullNameInput,
                         kycCountry: kycCountryInput,
-                        kycDocumentType: kycDocType
+                        kycDocumentType: kycDocType,
+                        kycDocumentUrl: kycFilePreview || undefined,
+                        kycDocumentFileName: kycFileName || undefined
                       });
                       setKycStatus({ message: 'Success! Your identity documents have been submitted and are under review.', type: 'success' });
                     }}
