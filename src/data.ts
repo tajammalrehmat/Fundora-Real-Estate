@@ -43,6 +43,7 @@ export const INITIAL_USER: UserAccount = {
   email: 'investor@example.com',
   name: 'Alex Mercer',
   role: 'user',
+  password: 'user123',
   referralCode: 'FUNDORA500',
   referredBy: 'ADMIN100',
   wallet: {
@@ -67,6 +68,7 @@ export const INITIAL_ADMIN: UserAccount = {
   email: 'no-reply@fundora.one',
   name: 'Platform Administrator',
   role: 'admin',
+  password: 'admin123',
   referralCode: 'FUNDORA_HQ',
   wallet: {
     usdtTrc20Address: '',

@@ -37,6 +37,15 @@ import {
   deleteInquiryFromFirebase
 } from './lib/firebaseSync';
 
+// Safe localStorage helper to prevent QuotaExceededError crashes with large attachments
+const safeSetLocalStorage = (key: string, value: string) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch (e) {
+    console.warn(`Failed to write to localStorage for key ${key}:`, e);
+  }
+};
+
 export default function App() {
   const [isFirebaseSynced, setIsFirebaseSynced] = useState<boolean>(false);
   const isInitialSyncRef = useRef(true);
@@ -365,7 +374,7 @@ export default function App() {
     const secureTime = await getSecureServerTime();
     const offset = secureTime.getTime() - Date.now();
     setClockOffset(offset);
-    localStorage.setItem('inv_clock_offset', offset.toString());
+    safeSetLocalStorage('inv_clock_offset', offset.toString());
   };
 
   useEffect(() => {
@@ -398,63 +407,63 @@ export default function App() {
 
   // Auto-Persist states to browser local storage & Firestore (Only after initial synchronization completes!)
   useEffect(() => {
-    localStorage.setItem('inv_projects', JSON.stringify(projectsList));
+    safeSetLocalStorage('inv_projects', JSON.stringify(projectsList));
     if (isFirebaseSynced && isFirebaseEnabled() && !isInitialSyncRef.current) {
       projectsList.forEach(proj => saveProjectToFirebase(proj));
     }
   }, [projectsList, isFirebaseSynced]);
 
   useEffect(() => {
-    localStorage.setItem('inv_transactions', JSON.stringify(transactionsList));
+    safeSetLocalStorage('inv_transactions', JSON.stringify(transactionsList));
     if (isFirebaseSynced && isFirebaseEnabled() && !isInitialSyncRef.current) {
       transactionsList.forEach(tx => saveTransactionToFirebase(tx));
     }
   }, [transactionsList, isFirebaseSynced]);
 
   useEffect(() => {
-    localStorage.setItem('inv_users', JSON.stringify(usersListState));
+    safeSetLocalStorage('inv_users', JSON.stringify(usersListState));
     if (isFirebaseSynced && isFirebaseEnabled() && !isInitialSyncRef.current) {
       usersListState.forEach(user => saveUserToFirebase(user));
     }
   }, [usersListState, isFirebaseSynced]);
 
   useEffect(() => {
-    localStorage.setItem('inv_active_user', activeUser ? JSON.stringify(activeUser) : '');
+    safeSetLocalStorage('inv_active_user', activeUser ? JSON.stringify(activeUser) : '');
     if (isFirebaseSynced && isFirebaseEnabled() && activeUser && !isInitialSyncRef.current) {
       saveUserToFirebase(activeUser);
     }
   }, [activeUser, isFirebaseSynced]);
 
   useEffect(() => {
-    localStorage.setItem('inv_investments', JSON.stringify(investmentsList));
+    safeSetLocalStorage('inv_investments', JSON.stringify(investmentsList));
     if (isFirebaseSynced && isFirebaseEnabled() && !isInitialSyncRef.current) {
       investmentsList.forEach(inv => saveInvestmentToFirebase(inv));
     }
   }, [investmentsList, isFirebaseSynced]);
 
   useEffect(() => {
-    localStorage.setItem('inv_claims', JSON.stringify(claimsHistory));
+    safeSetLocalStorage('inv_claims', JSON.stringify(claimsHistory));
     if (isFirebaseSynced && isFirebaseEnabled() && !isInitialSyncRef.current) {
       claimsHistory.forEach(cl => saveClaimToFirebase(cl));
     }
   }, [claimsHistory, isFirebaseSynced]);
 
   useEffect(() => {
-    localStorage.setItem('inv_security_logs', JSON.stringify(securityLogsList));
+    safeSetLocalStorage('inv_security_logs', JSON.stringify(securityLogsList));
     if (isFirebaseSynced && isFirebaseEnabled() && !isInitialSyncRef.current) {
       securityLogsList.forEach(log => saveSecurityLogToFirebase(log));
     }
   }, [securityLogsList, isFirebaseSynced]);
 
   useEffect(() => {
-    localStorage.setItem('inv_system_settings', JSON.stringify(systemSettings));
+    safeSetLocalStorage('inv_system_settings', JSON.stringify(systemSettings));
     if (isFirebaseSynced && isFirebaseEnabled() && !isInitialSyncRef.current) {
       saveSystemSettingsToFirebase(systemSettings);
     }
   }, [systemSettings, isFirebaseSynced]);
 
   useEffect(() => {
-    localStorage.setItem('inv_inquiries', JSON.stringify(inquiriesList));
+    safeSetLocalStorage('inv_inquiries', JSON.stringify(inquiriesList));
     if (isFirebaseSynced && isFirebaseEnabled() && !isInitialSyncRef.current) {
       inquiriesList.forEach(inq => saveInquiryToFirebase(inq));
     }
@@ -560,13 +569,13 @@ export default function App() {
 
         if (!lastRolloverDate) {
           // Initialize last_rollover_date on fresh database load so we don't double trigger immediately on first install
-          localStorage.setItem('inv_last_rollover_date', todayStr);
+          safeSetLocalStorage('inv_last_rollover_date', todayStr);
           console.log('[Auto-Rollover] Initialized last rollover date to today:', todayStr);
         } else if (lastRolloverDate !== todayStr) {
           // Date has changed to a new day! Trigger automatic rollover
           console.log('[Auto-Rollover] Date mismatch detected. Triggering automated daily payout / rollover...');
           handleSimulateDailyRollover();
-          localStorage.setItem('inv_last_rollover_date', todayStr);
+          safeSetLocalStorage('inv_last_rollover_date', todayStr);
           addSystemLog('Admin_Action', `Automated Daily Settlement Rollover executed: Yield and portfolio states updated for the new UTC day (${todayStr}).`, 'Secure');
         }
       } catch (err) {
@@ -603,10 +612,10 @@ export default function App() {
           );
           
           if (hasPakistaniData) {
-            localStorage.setItem('inv_projects', JSON.stringify(INITIAL_PROJECTS));
+            safeSetLocalStorage('inv_projects', JSON.stringify(INITIAL_PROJECTS));
             setProjectsList(INITIAL_PROJECTS);
             
-            localStorage.setItem('inv_users', JSON.stringify([INITIAL_USER, INITIAL_ADMIN]));
+            safeSetLocalStorage('inv_users', JSON.stringify([INITIAL_USER, INITIAL_ADMIN]));
             setUsersListState([INITIAL_USER, INITIAL_ADMIN]);
             
             const activeUserRaw = localStorage.getItem('inv_active_user');

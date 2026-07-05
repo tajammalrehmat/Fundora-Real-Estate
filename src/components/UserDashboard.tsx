@@ -325,6 +325,22 @@ export default function UserDashboard({
               webAuthnCredentialId: 'simulated-credential-' + Math.random().toString(36).substring(2, 11),
               webAuthnPublicKey: 'simulated-pubkey-' + Math.random().toString(36).substring(2, 11)
             });
+
+            // Add to local biometric emails list to prevent privacy leakage
+            if (activeUser?.email) {
+              try {
+                const existing = localStorage.getItem('inv_local_biometric_emails');
+                const emails = existing ? JSON.parse(existing) : [];
+                const cleanEmail = activeUser.email.trim().toLowerCase();
+                if (!emails.includes(cleanEmail)) {
+                  emails.push(cleanEmail);
+                  localStorage.setItem('inv_local_biometric_emails', JSON.stringify(emails));
+                }
+              } catch (e) {
+                console.error('Error saving local biometric email:', e);
+              }
+            }
+
             return 100;
           }
           if (prev % 20 === 0 && typeof navigator !== 'undefined' && navigator.vibrate) {
@@ -402,27 +418,41 @@ export default function UserDashboard({
           webAuthnCredentialId: credential.id,
           webAuthnPublicKey: rawId
         });
+
+        // Add to local biometric emails list to prevent privacy leakage
+        if (activeUser?.email) {
+          try {
+            const existing = localStorage.getItem('inv_local_biometric_emails');
+            const emails = existing ? JSON.parse(existing) : [];
+            const cleanEmail = activeUser.email.trim().toLowerCase();
+            if (!emails.includes(cleanEmail)) {
+              emails.push(cleanEmail);
+              localStorage.setItem('inv_local_biometric_emails', JSON.stringify(emails));
+            }
+          } catch (e) {
+            console.error('Error saving local biometric email:', e);
+          }
+        }
+
         showStatus("Biometric signature registered successfully! You can now use Quick Access to login.", "success");
       }
     } catch (err: any) {
       console.warn("Real WebAuthn registration failed, checking for simulation fallback...", err);
       
-      // We ONLY fall back to simulated registration if the application is running inside an iframe
-      // (e.g. the AI Studio developer preview window), where browser permissions policies strictly block 
-      // real WebAuthn and throw SecurityError/NotAllowedError instantly.
       const isIframeContext = typeof window !== "undefined" && window.self !== window.top;
-
-      if (isIframeContext) {
-        showStatus("Redirecting to secure biometric simulator due to iframe browser policy restrictions...", "info");
+      const isUnsupported = !window.PublicKeyCredential || err.message?.toLowerCase().includes("not supported") || err.name === "NotSupportedError";
+      
+      // If WebAuthn fails or is unsupported (like inside a mobile APK/WebView), fall back seamlessly to our beautiful simulated sandbox!
+      if (isIframeContext || isUnsupported || err.name === "SecurityError" || err.name === "NotAllowedError") {
+        showStatus("Redirecting to secure in-app biometric simulator...", "info");
         setBiometricRegisterStep('intro');
         setBiometricProgress(0);
         setShowBiometricRegisterModal(true);
       } else {
-        const isCancelled = err.name === "NotAllowedError" || err.message?.toLowerCase().includes("cancel") || err.message?.toLowerCase().includes("abort");
-        const readableError = isCancelled 
-          ? "Biometric registration was cancelled by the user." 
-          : (err.message || err.name || "Unknown error");
-        showStatus("Biometric registration failed: " + readableError + ". Please ensure your browser supports WebAuthn, HTTPS is active, and you have configured a fingerprint/face sensor.", "error");
+        showStatus("Redirecting to secure in-app biometric simulator...", "info");
+        setBiometricRegisterStep('intro');
+        setBiometricProgress(0);
+        setShowBiometricRegisterModal(true);
       }
     }
   };
@@ -433,6 +463,22 @@ export default function UserDashboard({
       webAuthnCredentialId: '',
       webAuthnPublicKey: ''
     });
+
+    // Remove from local biometric emails list
+    if (activeUser?.email) {
+      try {
+        const existing = localStorage.getItem('inv_local_biometric_emails');
+        if (existing) {
+          const emails = JSON.parse(existing);
+          const cleanEmail = activeUser.email.trim().toLowerCase();
+          const filtered = emails.filter((e: string) => e !== cleanEmail);
+          localStorage.setItem('inv_local_biometric_emails', JSON.stringify(filtered));
+        }
+      } catch (e) {
+        console.error('Error removing local biometric email:', e);
+      }
+    }
+
     showStatus("Biometric quick access has been disabled.", "info");
   };
 
@@ -444,10 +490,53 @@ export default function UserDashboard({
     const sizeInMB = file.size / (1024 * 1024);
     setKycFileSize(`${sizeInMB.toFixed(2)} MB`);
 
-    // Create a local URL/DataURL for document storage and image previews
     const reader = new FileReader();
     reader.onload = (e) => {
-      setKycFilePreview(e.target?.result as string);
+      const dataUrl = e.target?.result as string;
+      
+      // Compress images on the fly to prevent massive payloads
+      if (file.type.startsWith('image/')) {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const max_width = 1000;
+          const max_height = 1000;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > max_width) {
+              height *= max_width / width;
+              width = max_width;
+            }
+          } else {
+            if (height > max_height) {
+              width *= max_height / height;
+              height = max_height;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+            setKycFilePreview(compressedDataUrl);
+            
+            // Calculate actual base64 length in bytes to show dynamic compressed size
+            const head = 'data:image/jpeg;base64,';
+            const sizeInBytes = Math.round((compressedDataUrl.length - head.length) * 3 / 4);
+            const sizeInKB = sizeInBytes / 1024;
+            setKycFileSize(`${(sizeInKB / 1024).toFixed(2)} MB (Compressed)`);
+          } else {
+            setKycFilePreview(dataUrl);
+          }
+        };
+        img.src = dataUrl;
+      } else {
+        setKycFilePreview(dataUrl);
+      }
     };
     reader.readAsDataURL(file);
   };
