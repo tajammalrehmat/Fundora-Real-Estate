@@ -13,9 +13,9 @@ import {
 } from 'lucide-react';
 
 interface GlobalNavbarProps {
-  currentPage: 'home' | 'login' | 'register' | 'forgot' | 'dashboard' | 'admin';
+  currentPage: 'home' | 'login' | 'register' | 'forgot' | 'dashboard' | 'admin' | 'about';
   activeUser: UserAccount | null;
-  onNavigate: (page: 'home' | 'login' | 'register' | 'forgot' | 'dashboard' | 'admin', reason?: string) => void;
+  onNavigate: (page: 'home' | 'login' | 'register' | 'forgot' | 'dashboard' | 'admin' | 'about', reason?: string) => void;
   onLogout: () => void;
   // Dashboard tab controls
   activeTab?: 'overview' | 'properties' | 'wallet' | 'ledger' | 'claim' | 'referrals' | 'profile';
@@ -166,6 +166,15 @@ export default function GlobalNavbar({
           {activeUser === null ? (
             <>
               {/* Visitor links */}
+              <button 
+                onClick={() => onNavigate('about')}
+                className={`flex items-center gap-1 hover:text-emerald-400 transition-colors uppercase tracking-wider font-bold cursor-pointer text-xs ${
+                  currentPage === 'about' ? 'text-emerald-400 font-extrabold border-b-2 border-emerald-500 pb-0.5' : 'text-slate-400'
+                }`}
+              >
+                <HelpCircle className="w-3.5 h-3.5" />
+                <span>About Us</span>
+              </button>
               <a 
                 href="#browse-properties-anchor" 
                 onClick={(e) => handleAnchorClick('browse-properties-anchor', e)}
@@ -421,6 +430,16 @@ export default function GlobalNavbar({
             <>
               {/* Guest links */}
               <div className="flex flex-col space-y-3 font-semibold text-xs text-slate-450 uppercase tracking-widest mb-4">
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    onNavigate('about');
+                  }}
+                  className="w-full text-left py-2.5 border-b border-slate-900/80 flex items-center justify-between hover:text-white text-emerald-400 font-bold block cursor-pointer"
+                >
+                  <span>About Us & UK Reg</span>
+                  <HelpCircle className="w-4 h-4" />
+                </button>
                 <a 
                   href="#browse-properties-anchor" 
                   onClick={(e) => handleAnchorClick('browse-properties-anchor', e)}

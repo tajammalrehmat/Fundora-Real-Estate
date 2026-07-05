@@ -11,7 +11,7 @@ import { sendOtpEmail, isEmailServiceConfigured } from '../lib/emailService';
 interface AuthPagesProps {
   initialScreen?: 'login' | 'register' | 'forgot' | 'verify' | 'forgot-verify';
   onAuthSuccess: (user: UserAccount | { id: string; email: string; name: string; role: 'user' | 'admin'; referralCode: string; wallet: any; balance: number; totalDeposited: number; totalWithdrawn: number; totalInvestment: number; totalProfitEarned: number; isEmailVerified: boolean; registrationDate: string; referredBy?: string }) => void;
-  onNavigate: (page: 'home' | 'login' | 'register' | 'forgot' | 'dashboard' | 'admin', reason?: string) => void;
+  onNavigate: (page: 'home' | 'login' | 'register' | 'forgot' | 'dashboard' | 'admin' | 'about', reason?: string) => void;
   usersList: UserAccount[];
   addSystemLog: (type: any, desc: string, status: any) => void;
   authReason?: string | null;

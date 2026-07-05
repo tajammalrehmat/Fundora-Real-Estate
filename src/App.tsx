@@ -11,6 +11,7 @@ import UserDashboard from './components/UserDashboard';
 import AdminPanel from './components/AdminPanel';
 import GlobalNavbar from './components/GlobalNavbar';
 import BiometricLockScreen from './components/BiometricLockScreen';
+import AboutUs from './components/AboutUs';
 import { RealEstateProject, Transaction, UserAccount, InvestmentRecord, ProfitClaimRecord, SecurityLog, SystemSettings } from './types';
 import { INITIAL_PROJECTS, INITIAL_USER, INITIAL_ADMIN, INITIAL_TRANSACTIONS, INITIAL_SECURITY_LOGS } from './data';
 import { 
@@ -46,7 +47,7 @@ export default function App() {
     }
   }, [isFirebaseSynced]);
   // Navigation states
-  const [currentPage, setCurrentPage] = useState<'home' | 'login' | 'register' | 'forgot' | 'dashboard' | 'admin'>('home');
+  const [currentPage, setCurrentPage] = useState<'home' | 'login' | 'register' | 'forgot' | 'dashboard' | 'admin' | 'about'>('home');
   const [activeDashboardTab, setActiveDashboardTab] = useState<'overview' | 'properties' | 'wallet' | 'ledger' | 'claim' | 'referrals' | 'profile'>('overview');
   const [activeAdminTab, setActiveAdminTab] = useState<'stats' | 'deposits' | 'withdrawals' | 'projects' | 'users' | 'security'>('stats');
   const [scrollToAnchor, setScrollToAnchor] = useState<string | null>(null);
@@ -128,6 +129,8 @@ export default function App() {
           if (latestPg !== 'register') setCurrentPage('register');
         } else if (hash === '#/forgot' || hash.startsWith('#/forgot')) {
           if (latestPg !== 'forgot') setCurrentPage('forgot');
+        } else if (hash === '#/about' || hash.startsWith('#/about')) {
+          if (latestPg !== 'about') setCurrentPage('about');
         } else if (hash.startsWith('#/dashboard')) {
           const parts = hash.split('/');
           const tab = parts[2] as any;
@@ -191,6 +194,8 @@ export default function App() {
     let newHash = '';
     if (currentPage === 'home') {
       newHash = '#/home';
+    } else if (currentPage === 'about') {
+      newHash = '#/about';
     } else if (currentPage === 'login') {
       newHash = '#/login';
     } else if (currentPage === 'register') {
@@ -632,11 +637,11 @@ export default function App() {
   };
 
   // Switch navigation pages safely
-  const handlePageNavigation = (page: 'home' | 'login' | 'register' | 'forgot' | 'dashboard' | 'admin', reason?: string) => {
+  const handlePageNavigation = (page: 'home' | 'login' | 'register' | 'forgot' | 'dashboard' | 'admin' | 'about', reason?: string) => {
     console.log('[App] handlePageNavigation called with page:', page, 'reason:', reason);
     if (reason) {
       setAuthReason(reason);
-    } else if (page === 'home' || page === 'login' || page === 'register' || page === 'forgot') {
+    } else if (page === 'home' || page === 'login' || page === 'register' || page === 'forgot' || page === 'about') {
       if (!reason) {
         setAuthReason(null);
       }
@@ -1510,6 +1515,13 @@ export default function App() {
           allClaims={claimsHistory}
           projects={projectsList}
           allUsers={usersListState}
+        />
+      )}
+
+      {currentPage === 'about' && (
+        <AboutUs 
+          onNavigate={handlePageNavigation}
+          activeUser={activeUser}
         />
       )}
 

@@ -15,7 +15,7 @@ import fundoraCertificateImg from '../assets/images/fundora_certificate_17823756
 import { generateReceiptPDF } from '../utils/pdfReceipt';
 
 interface LandingPageProps {
-  onNavigate: (page: 'home' | 'login' | 'register' | 'forgot' | 'dashboard' | 'admin', reason?: string) => void;
+  onNavigate: (page: 'home' | 'login' | 'register' | 'forgot' | 'dashboard' | 'admin' | 'about', reason?: string) => void;
   onSelectProject: (project: RealEstateProject) => void;
   activeUser: UserAccount | null;
   allTransactions?: Transaction[];
@@ -907,6 +907,21 @@ export default function LandingPage({
 
       {/* Footer copyright */}
       <footer className="bg-slate-950 pt-6 pb-28 md:py-6 px-4 border-t border-slate-900 text-center text-[10px] text-slate-500 font-mono tracking-wide">
+        <div className="mb-3 flex justify-center gap-4 text-[11px] text-emerald-450 font-sans font-bold">
+          <button 
+            onClick={() => onNavigate('about')} 
+            className="hover:text-amber-400 transition-colors uppercase tracking-wider cursor-pointer"
+          >
+            About Us & Incorporation
+          </button>
+          <span>•</span>
+          <a 
+            href="#browse-properties-anchor" 
+            className="hover:text-amber-400 transition-colors uppercase tracking-wider"
+          >
+            Browse Properties
+          </a>
+        </div>
         <p>© 2026 FUNDORA REAL ESTATE PLATFORM. DEMOCRATIZING CO-OWNERSHIP BRIDGES.</p>
         <p className="mt-1 text-slate-600">Strictly registered with Companies House, United Kingdom (Company No. 16870956) & operating under automated smart compliance triggers.</p>
       </footer>
