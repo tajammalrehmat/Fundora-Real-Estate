@@ -166,7 +166,7 @@ If you didn't request this verification, simply ignore this email.
 
     try {
       // 1. Initialize GoogleGenAI client (lazy initialization)
-      const apiKey = process.env.GEMINI_API_KEY;
+      const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.VITE_GEMINI_API_KEY;
       if (!apiKey) {
         console.warn("GEMINI_API_KEY environment variable is not set. Using simulated receipt analyzer logic.");
         return res.json({

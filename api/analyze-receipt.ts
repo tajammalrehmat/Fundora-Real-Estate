@@ -29,7 +29,7 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.VITE_GEMINI_API_KEY;
     if (!apiKey) {
       console.warn("GEMINI_API_KEY environment variable is not set on Vercel. Using simulated receipt analyzer.");
       return res.status(200).json({
