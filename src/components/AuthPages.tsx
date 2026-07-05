@@ -250,7 +250,66 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
     setSimulatedScanProgress(0);
     setIsFingerPressed(false);
 
-    // We fall back to simulated credentials if in iframe OR if real WebAuthn is unsupported/fails
+    // 1. Detect if inside Median.co / GoNative WebView app
+    const isMedian = typeof window !== 'undefined' && (
+      !!(window as any).median || 
+      !!(window as any).gonative || 
+      ((window as any).webkit && (window as any).webkit.messageHandlers && !!(window as any).webkit.messageHandlers.gonative)
+    );
+
+    if (isMedian) {
+      console.log("Median.co WebView app detected. Triggering real hardware biometric scanner via mobile bridge...");
+      setIsSimulatedSandbox(false);
+      
+      const handleSuccess = () => {
+        addSystemLog('Login_Success', `Native Biometric authentication approved for ${userToAuth.email}`, 'Secure');
+        setBiometricLoginStep('complete');
+        const matched = userToAuth;
+        setTimeout(() => {
+          setShowBiometricLoginModal(false);
+          onAuthSuccess(matched);
+        }, 1200);
+      };
+
+      const handleFailure = (errReason: string) => {
+        console.warn("Native biometric authentication failed:", errReason);
+        setShowBiometricLoginModal(false);
+        setErrorMsg("Biometric verification rejected: " + errReason);
+      };
+
+      // Define a secure global callback
+      (window as any).medianBiometricLoginCallback = function(res: any) {
+        if (res && res.success) {
+          handleSuccess();
+        } else {
+          handleFailure(res && res.error ? res.error : "Verification rejected");
+        }
+      };
+
+      try {
+        const medianObj = (window as any).median || (window as any).gonative;
+        if (medianObj && medianObj.biometrics && typeof medianObj.biometrics.prompt === 'function') {
+          medianObj.biometrics.prompt({
+            message: `Verify identity for ${userToAuth.name}`,
+            callback: (res: any) => {
+              if (res && res.success) {
+                handleSuccess();
+              } else {
+                handleFailure(res && res.error ? res.error : "Verification rejected");
+              }
+            }
+          });
+        } else {
+          // Fallback via URL scheme
+          window.location.href = `gonative://biometrics/prompt?message=Login%20for%20${encodeURIComponent(userToAuth.name)}&callback=medianBiometricLoginCallback`;
+        }
+      } catch (err: any) {
+        handleFailure(err.message || String(err));
+      }
+      return;
+    }
+
+    // 2. Standard WebAuthn flow
     const isIframeContext = typeof window !== "undefined" && window.self !== window.top;
 
     if (isIframeContext) {
@@ -322,9 +381,20 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
         throw new Error("No credential was returned by the device.");
       }
     } catch (err: any) {
-      console.warn("Real WebAuthn verification failed, falling back to secure biometric sandbox simulation:", err);
-      // Automatically initiate sandbox simulation fallback so the mobile APK or unsecure browser still works beautifully!
-      setIsSimulatedSandbox(true);
+      console.warn("Real WebAuthn verification failed:", err);
+      
+      // We only fall back to the simulated fingerprint-hold modal inside the development preview iframe
+      if (isIframeContext) {
+        console.log("Falling back to secure biometric sandbox simulator for AI Studio developer environment...");
+        setIsSimulatedSandbox(true);
+      } else {
+        setShowBiometricLoginModal(false);
+        const isCancelled = err.name === "NotAllowedError" || err.message?.toLowerCase().includes("cancel") || err.message?.toLowerCase().includes("abort");
+        const readableError = isCancelled 
+          ? "Biometric authentication was cancelled by the user." 
+          : (err.message || err.name || "Unknown verification error");
+        setErrorMsg("Biometric verification failed: " + readableError + ". Please ensure your device has registered biometrics and you are connected via secure HTTPS.");
+      }
     }
   };
 

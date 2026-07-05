@@ -373,6 +373,76 @@ export default function UserDashboard({
   };
 
   const handleRegisterBiometrics = async () => {
+    // 1. Detect if inside Median.co / GoNative WebView app
+    const isMedian = typeof window !== 'undefined' && (
+      !!(window as any).median || 
+      !!(window as any).gonative || 
+      ((window as any).webkit && (window as any).webkit.messageHandlers && !!(window as any).webkit.messageHandlers.gonative)
+    );
+
+    if (isMedian) {
+      showStatus("Initiating native mobile biometric scan...", "info");
+      
+      const handleSuccess = () => {
+        onUpdateUser({
+          webAuthnEnabled: true,
+          webAuthnCredentialId: 'median-native-biometric',
+          webAuthnPublicKey: 'median-native-approved'
+        });
+
+        if (activeUser?.email) {
+          try {
+            const existing = localStorage.getItem('inv_local_biometric_emails');
+            const emails = existing ? JSON.parse(existing) : [];
+            const cleanEmail = activeUser.email.trim().toLowerCase();
+            if (!emails.includes(cleanEmail)) {
+              emails.push(cleanEmail);
+              localStorage.setItem('inv_local_biometric_emails', JSON.stringify(emails));
+            }
+          } catch (e) {
+            console.error('Error saving local biometric email:', e);
+          }
+        }
+        showStatus("Biometric quick access enabled successfully via native hardware sensor!", "success");
+      };
+
+      const handleFailure = (errReason: string) => {
+        showStatus("Native biometric verification failed or cancelled: " + errReason, "error");
+      };
+
+      // Define a secure callback for median.co native prompt
+      (window as any).medianBiometricRegisterCallback = function(res: any) {
+        if (res && res.success) {
+          handleSuccess();
+        } else {
+          handleFailure(res && res.error ? res.error : "Verification rejected");
+        }
+      };
+
+      try {
+        const medianObj = (window as any).median || (window as any).gonative;
+        if (medianObj && medianObj.biometrics && typeof medianObj.biometrics.prompt === 'function') {
+          medianObj.biometrics.prompt({
+            message: "Register your biometrics to secure your Fundora account",
+            callback: (res: any) => {
+              if (res && res.success) {
+                handleSuccess();
+              } else {
+                handleFailure(res && res.error ? res.error : "Verification rejected");
+              }
+            }
+          });
+        } else {
+          // Fallback via URL scheme
+          window.location.href = "gonative://biometrics/prompt?message=Register%20biometrics%20for%20Fundora&callback=medianBiometricRegisterCallback";
+        }
+      } catch (err: any) {
+        handleFailure(err.message || String(err));
+      }
+      return;
+    }
+
+    // 2. Standard WebAuthn flow
     try {
       if (!window.PublicKeyCredential) {
         throw new Error("WebAuthn is not supported on this browser.");
@@ -440,19 +510,19 @@ export default function UserDashboard({
       console.warn("Real WebAuthn registration failed, checking for simulation fallback...", err);
       
       const isIframeContext = typeof window !== "undefined" && window.self !== window.top;
-      const isUnsupported = !window.PublicKeyCredential || err.message?.toLowerCase().includes("not supported") || err.name === "NotSupportedError";
       
-      // If WebAuthn fails or is unsupported (like inside a mobile APK/WebView), fall back seamlessly to our beautiful simulated sandbox!
-      if (isIframeContext || isUnsupported || err.name === "SecurityError" || err.name === "NotAllowedError") {
+      // If WebAuthn fails inside the developer preview iframe, we fall back to simulated credentials for easy testing.
+      if (isIframeContext) {
         showStatus("Redirecting to secure in-app biometric simulator...", "info");
         setBiometricRegisterStep('intro');
         setBiometricProgress(0);
         setShowBiometricRegisterModal(true);
       } else {
-        showStatus("Redirecting to secure in-app biometric simulator...", "info");
-        setBiometricRegisterStep('intro');
-        setBiometricProgress(0);
-        setShowBiometricRegisterModal(true);
+        const isCancelled = err.name === "NotAllowedError" || err.message?.toLowerCase().includes("cancel") || err.message?.toLowerCase().includes("abort");
+        const readableError = isCancelled 
+          ? "Biometric registration was cancelled by the user." 
+          : (err.message || err.name || "Unknown error");
+        showStatus("Biometric registration failed: " + readableError + ". Please ensure your browser supports WebAuthn, HTTPS is active, and your sensor is configured.", "error");
       }
     }
   };
