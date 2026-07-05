@@ -109,7 +109,11 @@ export default async function handler(req: any, res: any) {
     });
 
     const responseText = response.text || "{}";
-    const parsedData = JSON.parse(responseText.trim());
+    let cleanedResponse = responseText.trim();
+    if (cleanedResponse.startsWith("```")) {
+      cleanedResponse = cleanedResponse.replace(/^```(?:json)?\s*/i, "").replace(/```$/, "").trim();
+    }
+    const parsedData = JSON.parse(cleanedResponse);
 
     return res.status(200).json({
       success: true,

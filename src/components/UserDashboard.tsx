@@ -729,6 +729,44 @@ export default function UserDashboard({
     setDepositProofInput('');
   };
 
+  const compressAndResizeImage = (base64Str: string, maxW = 1000, maxH = 1000): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.src = base64Str;
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxW || height > maxH) {
+          if (width > height) {
+            height = Math.round((height * maxW) / width);
+            width = maxW;
+          } else {
+            width = Math.round((width * maxH) / height);
+            height = maxH;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          // Compress as image/jpeg at 0.8 quality to keep image sharp but extremely light
+          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.8);
+          resolve(compressedBase64);
+        } else {
+          resolve(base64Str);
+        }
+      };
+      img.onerror = () => {
+        resolve(base64Str);
+      };
+    });
+  };
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -740,9 +778,13 @@ export default function UserDashboard({
     try {
       const reader = new FileReader();
       reader.onloadend = async () => {
-        const base64Data = reader.result as string;
+        const rawBase64 = reader.result as string;
         
         try {
+          // Downscale and compress the image to JPEG with 0.8 quality to fit within Vercel's 4.5MB payload limit
+          const base64Data = await compressAndResizeImage(rawBase64);
+          console.log("[UserDashboard] Compressed receipt size: from", Math.round(rawBase64.length / 1024), "KB to", Math.round(base64Data.length / 1024), "KB");
+
           const response = await fetch('/api/analyze-receipt', {
             method: 'POST',
             headers: {
@@ -750,7 +792,7 @@ export default function UserDashboard({
             },
             body: JSON.stringify({
               base64Data,
-              mimeType: file.type,
+              mimeType: 'image/jpeg', // Force jpeg due to canvas compression format
             }),
           });
 

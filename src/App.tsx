@@ -223,6 +223,11 @@ export default function App() {
     }
   }, [currentPage, activeDashboardTab, activeAdminTab]);
 
+  // Scroll to the top of the window on page and tab changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+  }, [currentPage, activeDashboardTab, activeAdminTab]);
+
   const [investmentsList, setInvestmentsList] = useState<InvestmentRecord[]>(() => {
     const saved = localStorage.getItem('inv_investments');
     const defaultRecord: InvestmentRecord[] = [

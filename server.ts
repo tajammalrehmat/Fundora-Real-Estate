@@ -250,7 +250,11 @@ If you didn't request this verification, simply ignore this email.
       const responseText = response.text || "{}";
       console.log(`[Receipt Analyzer] Gemini Raw Response:`, responseText);
       
-      const parsedData = JSON.parse(responseText.trim());
+      let cleanedResponse = responseText.trim();
+      if (cleanedResponse.startsWith("```")) {
+        cleanedResponse = cleanedResponse.replace(/^```(?:json)?\s*/i, "").replace(/```$/, "").trim();
+      }
+      const parsedData = JSON.parse(cleanedResponse);
 
       return res.json({
         success: true,
