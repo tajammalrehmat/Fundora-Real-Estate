@@ -94,6 +94,63 @@ export default function BiometricLockScreen({ activeUser, onUnlock, onLogout, ad
     setErrorMsg('');
     setLockStep('scanning');
 
+    // 1. Detect if inside Median.co / GoNative WebView app
+    const isMedian = typeof window !== 'undefined' && (
+      !!(window as any).median || 
+      !!(window as any).gonative || 
+      ((window as any).webkit && (window as any).webkit.messageHandlers && !!(window as any).webkit.messageHandlers.gonative)
+    );
+
+    if (isMedian) {
+      console.log("Median.co WebView app detected on Lock Screen. Triggering real hardware biometric scanner...");
+      
+      const handleSuccess = () => {
+        addSystemLog('Login_Success', `App unlocked via Real Native Biometrics for ${activeUser.email}`, 'Secure');
+        setLockStep('success');
+        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+          navigator.vibrate([80, 40, 80]);
+        }
+      };
+
+      const handleFailure = (errReason: string) => {
+        console.warn("Native biometric lock screen verification failed:", errReason);
+        setLockStep('error');
+        setErrorMsg("Biometric verification rejected: " + errReason);
+      };
+
+      // Define a secure global callback
+      (window as any).medianBiometricLockCallback = function(res: any) {
+        if (res && res.success) {
+          handleSuccess();
+        } else {
+          handleFailure(res && res.error ? res.error : "Verification rejected");
+        }
+      };
+
+      try {
+        const medianObj = (window as any).median || (window as any).gonative;
+        if (medianObj && medianObj.biometrics && typeof medianObj.biometrics.prompt === 'function') {
+          medianObj.biometrics.prompt({
+            message: "Verify identity to unlock Fundora",
+            callback: (res: any) => {
+              if (res && res.success) {
+                handleSuccess();
+              } else {
+                handleFailure(res && res.error ? res.error : "Verification rejected");
+              }
+            }
+          });
+        } else {
+          // Fallback via URL scheme
+          window.location.href = "gonative://biometrics/prompt?message=Verify%20identity%20to%20unlock%20Fundora&callback=medianBiometricLockCallback";
+        }
+      } catch (err: any) {
+        handleFailure(err.message || String(err));
+      }
+      return;
+    }
+
+    // 2. Standard WebAuthn flow
     try {
       if (!window.PublicKeyCredential) {
         throw new Error("Biometric WebAuthn authentication is not supported on this browser.");
