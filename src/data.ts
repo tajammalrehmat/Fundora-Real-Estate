@@ -58,9 +58,9 @@ export const INITIAL_USER: UserAccount = {
   totalProfitEarned: 132.50,
   isEmailVerified: true,
   registrationDate: '2026-04-10',
-  webAuthnEnabled: true,
-  webAuthnCredentialId: 'demo-credential-id',
-  webAuthnPublicKey: 'demo-public-key-handshake'
+  webAuthnEnabled: false,
+  webAuthnCredentialId: '',
+  webAuthnPublicKey: ''
 };
 
 export const INITIAL_ADMIN: UserAccount = {
