@@ -501,14 +501,6 @@ export default function BiometricLockScreen({ activeUser, onUnlock, onLogout, ad
                     <div className="pt-1 flex flex-col gap-1.5">
                       <button
                         type="button"
-                        onClick={() => setIsSimulatedSandbox(true)}
-                        className="mx-auto text-[9px] sm:text-[10px] font-mono uppercase bg-indigo-500/15 border border-indigo-500/30 hover:bg-indigo-500/25 text-indigo-300 px-3 py-1.5 rounded-lg transition-all font-bold cursor-pointer"
-                      >
-                        Use Simulated Fingerprint Scanner
-                      </button>
-                      
-                      <button
-                        type="button"
                         onClick={() => setShowPasswordUnlock(true)}
                         className="mx-auto text-[9px] sm:text-[9.5px] font-mono uppercase text-indigo-400 hover:text-indigo-200 transition-all font-semibold cursor-pointer"
                       >
