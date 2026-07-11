@@ -128,6 +128,45 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
   const [userToDisable, setUserToDisable] = useState<UserAccount | null>(null);
   const [biometricLoginStep, setBiometricLoginStep] = useState<'scanning' | 'complete' | 'error'>('scanning');
   const [detectedBiometricUser, setDetectedBiometricUser] = useState<UserAccount | null>(null);
+  const [biometricActionType, setBiometricActionType] = useState<'login' | 'enable'>('login');
+
+  const handleBiometricSuccess = (matched: UserAccount) => {
+    const cleanEmail = matched.email.trim().toLowerCase();
+    if (biometricActionType === 'enable') {
+      localStorage.setItem(`inv_device_biometric_active_${cleanEmail}`, 'true');
+      try {
+        const existing = localStorage.getItem('inv_local_biometric_emails');
+        const emails = existing ? JSON.parse(existing) : [];
+        if (!emails.includes(cleanEmail)) {
+          emails.push(cleanEmail);
+          localStorage.setItem('inv_local_biometric_emails', JSON.stringify(emails));
+        }
+      } catch (e) {
+        localStorage.setItem('inv_local_biometric_emails', JSON.stringify([cleanEmail]));
+      }
+
+      if (onUpdateUser) {
+        onUpdateUser(matched.id, { 
+          webAuthnEnabled: true,
+          webAuthnCredentialId: matched.webAuthnCredentialId || `simulated-credential-${Math.random().toString(36).substring(2, 11)}`,
+          webAuthnPublicKey: matched.webAuthnPublicKey || `simulated-pubkey-${Math.random().toString(36).substring(2, 11)}`
+        });
+      }
+
+      setSuccessMsg("Biometric verification successful! Biometric login is now enabled on this device.");
+      addSystemLog('Secure_Action', `Biometrics enabled from login screen for ${matched.email}`, 'Secure');
+      
+      setTimeout(() => {
+        setShowBiometricLoginModal(false);
+      }, 1200);
+    } else {
+      addSystemLog('Login_Success', `Biometric authentication approved for ${matched.email}`, 'Secure');
+      setTimeout(() => {
+        setShowBiometricLoginModal(false);
+        onAuthSuccess(matched);
+      }, 1200);
+    }
+  };
 
   // Simulated Iframe Interaction States
   const [isSimulatedSandbox, setIsSimulatedSandbox] = useState(false);
@@ -151,12 +190,9 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
             }
 
             const matched = detectedBiometricUser;
-            setTimeout(() => {
-              setShowBiometricLoginModal(false);
-              if (matched) {
-                onAuthSuccess(matched);
-              }
-            }, 1200);
+            if (matched) {
+              handleBiometricSuccess(matched);
+            }
             return 100;
           }
           
@@ -190,12 +226,14 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
     if (userToDisable && onUpdateUser) {
       onUpdateUser(userToDisable.id, { webAuthnEnabled: false });
 
+      const cleanEmail = userToDisable.email.trim().toLowerCase();
+      localStorage.setItem(`inv_device_biometric_active_${cleanEmail}`, 'false');
+
       // Remove from local biometric emails list
       try {
         const existing = localStorage.getItem('inv_local_biometric_emails');
         if (existing) {
           const emails = JSON.parse(existing);
-          const cleanEmail = userToDisable.email.trim().toLowerCase();
           const filtered = emails.filter((e: string) => e !== cleanEmail);
           localStorage.setItem('inv_local_biometric_emails', JSON.stringify(filtered));
         }
@@ -203,6 +241,7 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
         console.error('Error removing local biometric email:', e);
       }
 
+      setSuccessMsg("Biometric login has been disabled for this device.");
       addSystemLog('Login_Failure', `Biometrics disabled from login screen for ${userToDisable.email}`, 'Secure');
     }
     setShowBiometricDisableConfirm(false);
@@ -214,9 +253,10 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
     setUserToDisable(null);
   };
 
-  const handleBiometricLogin = async () => {
+  const handleBiometricLogin = async (actionType: 'login' | 'enable' = 'login') => {
     setErrorMsg('');
     setSuccessMsg('');
+    setBiometricActionType(actionType);
 
     const targetEmail = email.trim().toLowerCase();
     let userToAuth: UserAccount | undefined;
@@ -235,7 +275,8 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
         return;
       }
       const isLocal = localEmails.includes(targetEmail);
-      if (!userToAuth.webAuthnEnabled || !isLocal) {
+      const isAllowed = actionType === 'enable' ? userToAuth.webAuthnEnabled : (userToAuth.webAuthnEnabled && isLocal);
+      if (!isAllowed) {
         setErrorMsg("Biometric login has not been configured on this device for this account. Please log in with your password and enable it in Profile Settings.");
         return;
       }
@@ -274,13 +315,10 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
       setShowBiometricLoginModal(true);
 
       const handleSuccess = () => {
-        addSystemLog('Login_Success', `Native Biometric authentication approved for ${userToAuth.email}`, 'Secure');
         setBiometricLoginStep('complete');
-        const matched = userToAuth;
-        setTimeout(() => {
-          setShowBiometricLoginModal(false);
-          onAuthSuccess(matched);
-        }, 1200);
+        if (userToAuth) {
+          handleBiometricSuccess(userToAuth);
+        }
       };
 
       const handleFailure = (errReason: string) => {
@@ -320,13 +358,10 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
       setIsSimulatedSandbox(false);
       
       const handleSuccess = () => {
-        addSystemLog('Login_Success', `Native Biometric authentication approved for ${userToAuth.email}`, 'Secure');
         setBiometricLoginStep('complete');
-        const matched = userToAuth;
-        setTimeout(() => {
-          setShowBiometricLoginModal(false);
-          onAuthSuccess(matched);
-        }, 1200);
+        if (userToAuth) {
+          handleBiometricSuccess(userToAuth);
+        }
       };
 
       const handleFailure = (errReason: string) => {
@@ -367,7 +402,7 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
       return;
     }
 
-    // 2. Standard WebAuthn flow
+    // 3. Standard WebAuthn flow
     const isIframeContext = typeof window !== "undefined" && window.self !== window.top;
 
     if (isIframeContext) {
@@ -428,13 +463,8 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
       
       const assertion = await navigator.credentials.get(options);
       if (assertion) {
-        addSystemLog('Login_Success', `Biometric authentication approved for ${userToAuth.email}`, 'Secure');
         setBiometricLoginStep('complete');
-        const matched = userToAuth;
-        setTimeout(() => {
-          setShowBiometricLoginModal(false);
-          onAuthSuccess(matched);
-        }, 1200);
+        handleBiometricSuccess(userToAuth);
       } else {
         throw new Error("No credential was returned by the device.");
       }
@@ -950,14 +980,22 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
                 const isBiometricActive = !!(
                   activeBiometricUser && 
                   activeBiometricUser.webAuthnEnabled && 
-                  localEmails.includes(activeBiometricUser.email.toLowerCase().trim())
+                  localEmails.includes(activeBiometricUser.email.toLowerCase().trim()) &&
+                  localStorage.getItem(`inv_device_biometric_active_${activeBiometricUser.email.toLowerCase().trim()}`) === 'true'
                 );
 
                 const handleToggleSwitch = () => {
                   if (isBiometricActive) {
-                    handleBiometricLogin();
+                    if (activeBiometricUser) {
+                      setUserToDisable(activeBiometricUser);
+                      setShowBiometricDisableConfirm(true);
+                    }
                   } else {
-                    setShowBiometricInfoModal(true);
+                    if (activeBiometricUser && activeBiometricUser.webAuthnEnabled) {
+                      handleBiometricLogin('enable');
+                    } else {
+                      setShowBiometricInfoModal(true);
+                    }
                   }
                 };
 

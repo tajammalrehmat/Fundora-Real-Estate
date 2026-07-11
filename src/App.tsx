@@ -538,13 +538,19 @@ export default function App() {
             const freshUser = users.find(u => u.id === parsed.id || u.email.toLowerCase() === parsed.email.toLowerCase());
             if (freshUser) {
               setActiveUser(freshUser);
-              if (freshUser.webAuthnEnabled && isAppLockedRef.current) {
+              const isLocalActive = localStorage.getItem(`inv_device_biometric_active_${freshUser.email.toLowerCase().trim()}`) === 'true';
+              if (freshUser.webAuthnEnabled && isAppLockedRef.current && isLocalActive) {
                 setIsAppLocked(true);
+              } else {
+                setIsAppLocked(false);
               }
             } else {
               setActiveUser(parsed);
-              if (parsed.webAuthnEnabled && isAppLockedRef.current) {
+              const isLocalActive = localStorage.getItem(`inv_device_biometric_active_${parsed.email.toLowerCase().trim()}`) === 'true';
+              if (parsed.webAuthnEnabled && isAppLockedRef.current && isLocalActive) {
                 setIsAppLocked(true);
+              } else {
+                setIsAppLocked(false);
               }
             }
           } catch (_) {

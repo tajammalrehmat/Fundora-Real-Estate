@@ -332,9 +332,10 @@ export default function UserDashboard({
             // Add to local biometric emails list to prevent privacy leakage
             if (activeUser?.email) {
               try {
+                const cleanEmail = activeUser.email.trim().toLowerCase();
+                localStorage.setItem(`inv_device_biometric_active_${cleanEmail}`, 'true');
                 const existing = localStorage.getItem('inv_local_biometric_emails');
                 const emails = existing ? JSON.parse(existing) : [];
-                const cleanEmail = activeUser.email.trim().toLowerCase();
                 if (!emails.includes(cleanEmail)) {
                   emails.push(cleanEmail);
                   localStorage.setItem('inv_local_biometric_emails', JSON.stringify(emails));
@@ -402,9 +403,10 @@ export default function UserDashboard({
 
           if (activeUser?.email) {
             try {
+              const cleanEmail = activeUser.email.trim().toLowerCase();
+              localStorage.setItem(`inv_device_biometric_active_${cleanEmail}`, 'true');
               const existing = localStorage.getItem('inv_local_biometric_emails');
               const emails = existing ? JSON.parse(existing) : [];
-              const cleanEmail = activeUser.email.trim().toLowerCase();
               if (!emails.includes(cleanEmail)) {
                 emails.push(cleanEmail);
                 localStorage.setItem('inv_local_biometric_emails', JSON.stringify(emails));
@@ -444,9 +446,10 @@ export default function UserDashboard({
 
         if (activeUser?.email) {
           try {
+            const cleanEmail = activeUser.email.trim().toLowerCase();
+            localStorage.setItem(`inv_device_biometric_active_${cleanEmail}`, 'true');
             const existing = localStorage.getItem('inv_local_biometric_emails');
             const emails = existing ? JSON.parse(existing) : [];
-            const cleanEmail = activeUser.email.trim().toLowerCase();
             if (!emails.includes(cleanEmail)) {
               emails.push(cleanEmail);
               localStorage.setItem('inv_local_biometric_emails', JSON.stringify(emails));
@@ -544,9 +547,10 @@ export default function UserDashboard({
         // Add to local biometric emails list to prevent privacy leakage
         if (activeUser?.email) {
           try {
+            const cleanEmail = activeUser.email.trim().toLowerCase();
+            localStorage.setItem(`inv_device_biometric_active_${cleanEmail}`, 'true');
             const existing = localStorage.getItem('inv_local_biometric_emails');
             const emails = existing ? JSON.parse(existing) : [];
-            const cleanEmail = activeUser.email.trim().toLowerCase();
             if (!emails.includes(cleanEmail)) {
               emails.push(cleanEmail);
               localStorage.setItem('inv_local_biometric_emails', JSON.stringify(emails));
@@ -577,10 +581,11 @@ export default function UserDashboard({
     // Remove from local biometric emails list
     if (activeUser?.email) {
       try {
+        const cleanEmail = activeUser.email.trim().toLowerCase();
+        localStorage.setItem(`inv_device_biometric_active_${cleanEmail}`, 'false');
         const existing = localStorage.getItem('inv_local_biometric_emails');
         if (existing) {
           const emails = JSON.parse(existing);
-          const cleanEmail = activeUser.email.trim().toLowerCase();
           const filtered = emails.filter((e: string) => e !== cleanEmail);
           localStorage.setItem('inv_local_biometric_emails', JSON.stringify(filtered));
         }
@@ -927,7 +932,6 @@ export default function UserDashboard({
   const compressAndResizeImage = (base64Str: string, maxW = 1000, maxH = 1000): Promise<string> => {
     return new Promise((resolve) => {
       const img = new Image();
-      img.src = base64Str;
       img.onload = () => {
         let width = img.width;
         let height = img.height;
@@ -959,6 +963,7 @@ export default function UserDashboard({
       img.onerror = () => {
         resolve(base64Str);
       };
+      img.src = base64Str;
     });
   };
 
@@ -3110,14 +3115,11 @@ ${activeViewDoc.project.description}`
                           <input 
                             type="number"
                             required
-                            readOnly
                             placeholder="Auto-fills from Receipt..."
                             value={depositAmount || ''}
-                            className="w-full bg-[#060819] border border-indigo-500/20 rounded-xl py-3 pl-7 pr-8 text-[10px] sm:text-xs placeholder:text-[10px] sm:placeholder:text-xs text-indigo-200 font-extrabold cursor-not-allowed shadow-2xs"
+                            onChange={(e) => setDepositAmount(Number(e.target.value))}
+                            className="w-full bg-[#060819] border border-indigo-500/20 rounded-xl py-3 pl-7 pr-8 text-[10px] sm:text-xs placeholder:text-[10px] sm:placeholder:text-xs text-indigo-200 font-extrabold shadow-2xs"
                           />
-                          <span className="absolute right-3.5 top-3 text-indigo-400">
-                            <Lock className="w-3.5 h-3.5" />
-                          </span>
                         </div>
                       </div>
 
@@ -3156,14 +3158,11 @@ ${activeViewDoc.project.description}`
                         <input 
                           type="text"
                           required
-                          readOnly
                           value={depositHashInput}
+                          onChange={(e) => setDepositHashInput(e.target.value)}
                           placeholder="Auto-fills from Receipt..."
-                          className="w-full bg-[#060819]/60 border border-indigo-500/20 rounded-xl p-3 pr-10 text-[10px] sm:text-xs placeholder:text-[10px] sm:placeholder:text-xs text-indigo-200 font-mono cursor-not-allowed shadow-2xs"
+                          className="w-full bg-[#060819]/60 border border-indigo-500/20 rounded-xl p-3 pr-10 text-[10px] sm:text-xs placeholder:text-[10px] sm:placeholder:text-xs text-indigo-200 font-mono shadow-2xs"
                         />
-                        <span className="absolute right-3.5 top-3 text-indigo-400">
-                          <Lock className="w-3.5 h-3.5" />
-                        </span>
                       </div>
                     </div>
                   </div>
@@ -4607,7 +4606,9 @@ ${activeViewDoc.project.description}`
                 try {
                   const existing = localStorage.getItem('inv_local_biometric_emails');
                   const emails = existing ? JSON.parse(existing) : [];
-                  return emails.includes(activeUser.email.toLowerCase().trim());
+                  const cleanEmail = activeUser.email.toLowerCase().trim();
+                  return emails.includes(cleanEmail) &&
+                         localStorage.getItem(`inv_device_biometric_active_${cleanEmail}`) === 'true';
                 } catch (e) {
                   return false;
                 }
