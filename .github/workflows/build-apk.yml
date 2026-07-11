@@ -38,9 +38,14 @@ jobs:
       - name: Sync Capacitor
         run: npm run cap:sync
 
-      - name: Build APK
-        working-directory: android
+        - name: Download Clean Gradle Wrapper Jar
         run: |
+          mkdir -p android/gradle/wrapper
+          curl -sL https://raw.githubusercontent.com/gradle/gradle/v8.14.3/gradle/wrapper/gradle-wrapper.jar -o android/gradle/wrapper/gradle-wrapper.jar
+
+      - name: Build APK
+        run: |
+          cd android
           chmod +x gradlew
           ./gradlew assembleDebug
 
