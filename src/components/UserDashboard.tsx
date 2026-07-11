@@ -5,7 +5,7 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { NativeBiometric } from 'capacitor-native-biometric';
-import { getApiUrl } from '../utils/api';
+import { getApiUrl, fetchWithFallback } from '../utils/api';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 import { RealEstateProject, Transaction, UserAccount, InvestmentRecord, ProfitClaimRecord, getAvatarBgClass, getInvestorTier, SystemSettings } from '../types';
 import { generateReceiptPDF, generateDocumentPDF } from '../utils/pdfReceipt';
@@ -985,7 +985,7 @@ export default function UserDashboard({
           const base64Data = await compressAndResizeImage(rawBase64);
           console.log("[UserDashboard] Compressed receipt size: from", Math.round(rawBase64.length / 1024), "KB to", Math.round(base64Data.length / 1024), "KB");
 
-          const response = await fetch(getApiUrl('/api/analyze-receipt'), {
+          const response = await fetchWithFallback('/api/analyze-receipt', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -1006,18 +1006,31 @@ export default function UserDashboard({
             let matchMessage = "";
 
             if (txid) {
-              setDepositHashInput(txid);
-              matchMessage += `TxID (${txid.slice(0, 10)}...) `;
+              setDepositHashInput(txid.trim());
+              matchMessage += `TxID (${txid.trim().slice(0, 10)}...) `;
             }
 
-            if (amount !== undefined && amount !== null && !isNaN(amount)) {
-              setDepositAmount(Number(amount));
-              matchMessage += `Amount (${amount} USDT) `;
+            if (amount !== undefined && amount !== null) {
+              let parsedAmount = amount;
+              if (typeof amount === 'string') {
+                const cleaned = amount.replace(/[^\d.]/g, '');
+                parsedAmount = parseFloat(cleaned);
+              }
+              if (!isNaN(parsedAmount) && parsedAmount > 0) {
+                setDepositAmount(parsedAmount);
+                matchMessage += `Amount (${parsedAmount} USDT) `;
+              }
             }
 
-            if (network === 'TRC20' || network === 'BEP20') {
-              setDepositNetwork(network);
-              matchMessage += `Network (${network}) `;
+            if (network) {
+              const upperNetwork = String(network).toUpperCase();
+              if (upperNetwork.includes('TRC') || upperNetwork.includes('TRX') || upperNetwork.includes('TRON')) {
+                setDepositNetwork('TRC20');
+                matchMessage += `Network (TRC20) `;
+              } else if (upperNetwork.includes('BEP') || upperNetwork.includes('BSC') || upperNetwork.includes('BINANCE') || upperNetwork.includes('0X')) {
+                setDepositNetwork('BEP20');
+                matchMessage += `Network (BEP20) `;
+              }
             }
 
             if (matchMessage) {
@@ -1030,7 +1043,9 @@ export default function UserDashboard({
           }
         } catch (apiErr: any) {
           console.error("API error during receipt analysis:", apiErr);
-          showStatus(`✓ Image "${file.name}" attached. (AI auto-fetch unavailable, please type TxID/amount manually)`, "info");
+          // Show actual error details to help the user understand why it failed
+          const errMsg = apiErr.message || String(apiErr);
+          showStatus(`✓ Attached. (AI auto-fetch unavailable: ${errMsg.slice(0, 60)})`, "info");
         } finally {
           setIsAnalyzingReceipt(false);
         }

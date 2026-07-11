@@ -48,3 +48,52 @@ export const getApiUrl = (path: string): string => {
   // 5. Ultimate fallback to the current live URL of the platform
   return `https://ais-pre-hb5de275kkaohqffdp2qfz-614235734610.asia-southeast1.run.app${formattedPath}`;
 };
+
+/**
+ * Smart fetch helper that automatically retries with the alternative workspace environment
+ * (e.g. falls back from preview to dev, or vice versa) if the primary fetch fails or is unreachable.
+ * This ensures the mobile APK can communicate with whichever server (dev or pre) is actively hosting the APIs.
+ */
+export const fetchWithFallback = async (path: string, options: RequestInit = {}): Promise<Response> => {
+  const primaryUrl = getApiUrl(path);
+  const formattedPath = path.startsWith('/') ? path : `/${path}`;
+
+  try {
+    console.log(`[API Proxy] Primary fetch attempt to: ${primaryUrl}`);
+    const response = await fetch(primaryUrl, options);
+    
+    // If it's a gateway/server offline error or 404/502/503/504, we failover
+    if (!response.ok && response.status >= 500) {
+      throw new Error(`Server returned error status: ${response.status}`);
+    }
+    return response;
+  } catch (err: any) {
+    console.warn(`[API Proxy] Primary URL (${primaryUrl}) unreachable or failed: ${err.message || err}. Initiating smart environment failover...`);
+
+    const devUrl = 'https://ais-dev-hb5de275kkaohqffdp2qfz-614235734610.asia-southeast1.run.app';
+    const preUrl = 'https://ais-pre-hb5de275kkaohqffdp2qfz-614235734610.asia-southeast1.run.app';
+
+    let fallbackUrl = '';
+    if (primaryUrl.includes('ais-pre-')) {
+      fallbackUrl = `${devUrl}${formattedPath}`;
+    } else if (primaryUrl.includes('ais-dev-')) {
+      fallbackUrl = `${preUrl}${formattedPath}`;
+    } else {
+      fallbackUrl = `${devUrl}${formattedPath}`;
+    }
+
+    console.log(`[API Proxy] Failover fetch attempt to: ${fallbackUrl}`);
+    try {
+      const fallbackResponse = await fetch(fallbackUrl, options);
+      if (!fallbackResponse.ok) {
+        console.warn(`[API Proxy] Fallback URL (${fallbackUrl}) returned status: ${fallbackResponse.status}`);
+      }
+      return fallbackResponse;
+    } catch (fallbackErr: any) {
+      console.error(`[API Proxy] Fallback URL (${fallbackUrl}) also failed:`, fallbackErr);
+      // Re-throw to propagate back to caller
+      throw fallbackErr;
+    }
+  }
+};
+

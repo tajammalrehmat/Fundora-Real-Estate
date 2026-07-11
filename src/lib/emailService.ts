@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { getApiUrl } from '../utils/api';
+import { getApiUrl, fetchWithFallback } from '../utils/api';
 
 /**
  * Service to handle transactional email notifications and OTP codes
@@ -66,7 +66,7 @@ export const sendOtpEmail = async (params: EmailParams): Promise<{ success: bool
 
     // First, try the proxy server route (Express backend or Vercel serverless function /api/send-otp)
     try {
-      const response = await fetch(getApiUrl('/api/send-otp'), {
+      const response = await fetchWithFallback('/api/send-otp', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
