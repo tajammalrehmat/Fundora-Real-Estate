@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { NativeBiometric } from 'capacitor-native-biometric';
 import { UserAccount } from '../types';
 import { ShieldAlert, Mail, Lock, User, Key, UserCheck, AlertTriangle, Sparkles, Shield, Loader2, Fingerprint } from 'lucide-react';
 import { sendOtpEmail, isEmailServiceConfigured } from '../lib/emailService';
@@ -250,7 +251,54 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
     setSimulatedScanProgress(0);
     setIsFingerPressed(false);
 
-    // 1. Detect if inside Median.co / GoNative WebView app
+    // 1. Detect if inside Capacitor native app
+    const isCapacitor = typeof window !== 'undefined' && (window as any).Capacitor && (
+      (window as any).Capacitor.isNative || 
+      ((window as any).Capacitor.getPlatform && (window as any).Capacitor.getPlatform() !== 'web')
+    );
+
+    if (isCapacitor) {
+      console.log("Capacitor app detected. Triggering native device biometric authentication...");
+      setIsSimulatedSandbox(false);
+      setBiometricLoginStep('scanning');
+      setShowBiometricLoginModal(true);
+
+      const handleSuccess = () => {
+        addSystemLog('Login_Success', `Native Biometric authentication approved for ${userToAuth.email}`, 'Secure');
+        setBiometricLoginStep('complete');
+        const matched = userToAuth;
+        setTimeout(() => {
+          setShowBiometricLoginModal(false);
+          onAuthSuccess(matched);
+        }, 1200);
+      };
+
+      const handleFailure = (errReason: string) => {
+        console.warn("Native biometric authentication failed:", errReason);
+        setShowBiometricLoginModal(false);
+        setErrorMsg("Biometric verification rejected: " + errReason);
+      };
+
+      try {
+        const available = await NativeBiometric.isAvailable();
+        if (available.isAvailable) {
+          await NativeBiometric.verifyIdentity({
+            reason: "Verify your identity to log into your Fundora account",
+            title: "Fundora Biometric Login",
+            subtitle: "Verify fingerprint or Face ID",
+            description: "Place your finger on the sensor to continue"
+          });
+          handleSuccess();
+        } else {
+          handleFailure("Biometrics not set up or not available on this device.");
+        }
+      } catch (err: any) {
+        handleFailure(err.message || String(err));
+      }
+      return;
+    }
+
+    // 2. Detect if inside Median.co / GoNative WebView app
     const isMedian = typeof window !== 'undefined' && (
       !!(window as any).median || 
       !!(window as any).gonative || 

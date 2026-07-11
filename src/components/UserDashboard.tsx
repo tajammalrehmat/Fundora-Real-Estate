@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { NativeBiometric } from 'capacitor-native-biometric';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 import { RealEstateProject, Transaction, UserAccount, InvestmentRecord, ProfitClaimRecord, getAvatarBgClass, getInvestorTier, SystemSettings } from '../types';
 import { generateReceiptPDF, generateDocumentPDF } from '../utils/pdfReceipt';
@@ -373,7 +374,56 @@ export default function UserDashboard({
   };
 
   const handleRegisterBiometrics = async () => {
-    // 1. Detect if inside Median.co / GoNative WebView app
+    // 1. Detect if inside Capacitor native app
+    const isCapacitor = typeof window !== 'undefined' && (window as any).Capacitor && (
+      (window as any).Capacitor.isNative || 
+      ((window as any).Capacitor.getPlatform && (window as any).Capacitor.getPlatform() !== 'web')
+    );
+
+    if (isCapacitor) {
+      showStatus("Initiating native mobile biometric scan...", "info");
+      try {
+        const available = await NativeBiometric.isAvailable();
+        if (available.isAvailable) {
+          await NativeBiometric.verifyIdentity({
+            reason: "Register fingerprint biometric quick access for your Fundora account",
+            title: "Register Biometrics",
+            subtitle: "Link your device's fingerprint or Face ID",
+            description: "Place your finger on the sensor to continue"
+          });
+
+          onUpdateUser({
+            webAuthnEnabled: true,
+            webAuthnCredentialId: 'capacitor-native-biometric',
+            webAuthnPublicKey: 'capacitor-approved-key'
+          });
+
+          if (activeUser?.email) {
+            try {
+              const existing = localStorage.getItem('inv_local_biometric_emails');
+              const emails = existing ? JSON.parse(existing) : [];
+              const cleanEmail = activeUser.email.trim().toLowerCase();
+              if (!emails.includes(cleanEmail)) {
+                emails.push(cleanEmail);
+                localStorage.setItem('inv_local_biometric_emails', JSON.stringify(emails));
+              }
+            } catch (e) {
+              console.error('Error saving local biometric email:', e);
+            }
+          }
+
+          showStatus("Native biometric authentication registered successfully!", "success");
+        } else {
+          showStatus("No native biometric hardware available or set up on this device.", "error");
+        }
+      } catch (err: any) {
+        console.warn("Capacitor biometric registration failed:", err);
+        showStatus("Biometric registration failed: " + (err.message || String(err)), "error");
+      }
+      return;
+    }
+
+    // 2. Detect if inside Median.co / GoNative WebView app
     const isMedian = typeof window !== 'undefined' && (
       !!(window as any).median || 
       !!(window as any).gonative || 
