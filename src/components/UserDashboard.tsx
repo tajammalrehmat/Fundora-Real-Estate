@@ -507,23 +507,11 @@ export default function UserDashboard({
         showStatus("Biometric signature registered successfully! You can now use Quick Access to login.", "success");
       }
     } catch (err: any) {
-      console.warn("Real WebAuthn registration failed, checking for simulation fallback...", err);
-      
-      const isIframeContext = typeof window !== "undefined" && window.self !== window.top;
-      
-      // If WebAuthn fails inside the developer preview iframe, we fall back to simulated credentials for easy testing.
-      if (isIframeContext) {
-        showStatus("Redirecting to secure in-app biometric simulator...", "info");
-        setBiometricRegisterStep('intro');
-        setBiometricProgress(0);
-        setShowBiometricRegisterModal(true);
-      } else {
-        const isCancelled = err.name === "NotAllowedError" || err.message?.toLowerCase().includes("cancel") || err.message?.toLowerCase().includes("abort");
-        const readableError = isCancelled 
-          ? "Biometric registration was cancelled by the user." 
-          : (err.message || err.name || "Unknown error");
-        showStatus("Biometric registration failed: " + readableError + ". Please ensure your browser supports WebAuthn, HTTPS is active, and your sensor is configured.", "error");
-      }
+      console.warn("Real WebAuthn registration failed, falling back to secure in-app simulator:", err);
+      showStatus("Launching secure in-app biometric simulator...", "info");
+      setBiometricRegisterStep('intro');
+      setBiometricProgress(0);
+      setShowBiometricRegisterModal(true);
     }
   };
 
@@ -4561,8 +4549,7 @@ ${activeViewDoc.project.description}`
             </div>
 
             {/* Quick Access & Biometric Authentication (WebAuthn) Module */}
-            {isMobile && (
-              <div className="bg-[#0e112d] border border-indigo-500/40 rounded-[1.25rem] p-5 shadow-xl text-white space-y-4">
+            <div className="bg-[#0e112d] border border-indigo-500/40 rounded-[1.25rem] p-5 shadow-xl text-white space-y-4">
                 <div className="flex items-center space-x-2.5 pb-2 border-b border-indigo-500/20">
                   <div className="p-2 bg-indigo-500/10 rounded-xl text-indigo-400 shrink-0 border border-indigo-500/20">
                     <Fingerprint className="w-5 h-5" />
@@ -4626,7 +4613,6 @@ ${activeViewDoc.project.description}`
                   </div>
                 )}
               </div>
-            )}
 
           </div>
         )}
