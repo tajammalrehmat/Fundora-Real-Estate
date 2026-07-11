@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Fingerprint, Lock, Unlock, KeyRound } from 'lucide-react';
+import { NativeBiometric } from 'capacitor-native-biometric';
 import { UserAccount } from '../types';
 
 interface BiometricLockScreenProps {
@@ -94,7 +95,49 @@ export default function BiometricLockScreen({ activeUser, onUnlock, onLogout, ad
     setErrorMsg('');
     setLockStep('scanning');
 
-    // 1. Detect if inside Median.co / GoNative WebView app
+    // 1. Detect if inside Capacitor native app
+    const isCapacitor = typeof window !== 'undefined' && (window as any).Capacitor && (
+      (window as any).Capacitor.isNative || 
+      ((window as any).Capacitor.getPlatform && (window as any).Capacitor.getPlatform() !== 'web')
+    );
+
+    if (isCapacitor) {
+      console.log("Capacitor app detected on Lock Screen. Triggering real hardware biometric scanner...");
+      
+      const handleSuccess = () => {
+        addSystemLog('Login_Success', `App unlocked via Real Native Biometrics for ${activeUser.email}`, 'Secure');
+        setLockStep('success');
+        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+          navigator.vibrate([80, 40, 80]);
+        }
+      };
+
+      const handleFailure = (errReason: string) => {
+        console.warn("Native biometric lock screen verification failed:", errReason);
+        setLockStep('error');
+        setErrorMsg("Biometric verification rejected: " + errReason);
+      };
+
+      try {
+        const available = await NativeBiometric.isAvailable();
+        if (available.isAvailable) {
+          await NativeBiometric.verifyIdentity({
+            reason: "Verify identity to unlock your Fundora account",
+            title: "Fundora Biometric Unlock",
+            subtitle: "Verify fingerprint or Face ID",
+            description: "Place your finger on the sensor to continue"
+          });
+          handleSuccess();
+        } else {
+          handleFailure("Biometrics not set up or not available on this device.");
+        }
+      } catch (err: any) {
+        handleFailure(err.message || String(err));
+      }
+      return;
+    }
+
+    // 2. Detect if inside Median.co / GoNative WebView app
     const isMedian = typeof window !== 'undefined' && (
       !!(window as any).median || 
       !!(window as any).gonative || 
@@ -150,7 +193,7 @@ export default function BiometricLockScreen({ activeUser, onUnlock, onLogout, ad
       return;
     }
 
-    // 2. Standard WebAuthn flow
+    // 3. Standard WebAuthn flow
     try {
       if (!window.PublicKeyCredential) {
         throw new Error("Biometric WebAuthn authentication is not supported on this browser.");
@@ -217,13 +260,16 @@ export default function BiometricLockScreen({ activeUser, onUnlock, onLogout, ad
       const readableError = isCancelled 
         ? "Verification cancelled." 
         : (err.message || err.name || "Unknown verification error");
-      setErrorMsg("Verification failed: " + readableError + ". Switching to secure simulated scanner...");
+      setErrorMsg("Verification failed: " + readableError);
       
-      // Auto fallback to simulated sandbox if real biometric fails or isn't supported!
-      setTimeout(() => {
-        setIsSimulatedSandbox(true);
-        setLockStep('locked');
-      }, 2000);
+      // Auto fallback to simulated sandbox if real biometric fails or isn't supported inside iframe context!
+      if (isIframeContext) {
+        setErrorMsg("Verification failed: " + readableError + ". Switching to secure simulated scanner...");
+        setTimeout(() => {
+          setIsSimulatedSandbox(true);
+          setLockStep('locked');
+        }, 2000);
+      }
     }
   };
 
