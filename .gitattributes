@@ -1,0 +1,14 @@
+# Force git to treat Gradle wrapper files correctly
+# Make sure .jar files are treated as binary to prevent line-ending corruption (CRLF/LF conversion)
+*.jar binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+
+# Ensure shell scripts always have LF line endings to prevent "Command not found" or syntax errors on Linux/macOS
+gradlew text eol=lf
+
+# Ensure Windows batch files always have CRLF line endings
+gradlew.bat text eol=crlf
