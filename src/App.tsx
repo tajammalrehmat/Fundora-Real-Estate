@@ -105,7 +105,12 @@ export default function App() {
     if (!saved) return false;
     try {
       const parsed = JSON.parse(saved);
-      return !!(parsed && parsed.webAuthnEnabled);
+      if (parsed && parsed.webAuthnEnabled) {
+        const localSaved = localStorage.getItem('inv_local_biometric_emails');
+        const localEmails = localSaved ? JSON.parse(localSaved) : [];
+        return localEmails.includes(parsed.email.toLowerCase().trim());
+      }
+      return false;
     } catch (_) {
       return false;
     }

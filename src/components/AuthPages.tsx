@@ -221,24 +221,25 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
     const targetEmail = email.trim().toLowerCase();
     let userToAuth: UserAccount | undefined;
 
+    // Fetch local emails registered on this specific device to prevent data leaks / privacy breaches
+    let localEmails: string[] = [];
+    try {
+      const saved = localStorage.getItem('inv_local_biometric_emails');
+      localEmails = saved ? JSON.parse(saved) : [];
+    } catch (e) {}
+
     if (targetEmail) {
       userToAuth = usersList.find(u => u.email.toLowerCase() === targetEmail);
       if (!userToAuth) {
         setErrorMsg("This email address is not registered in our database. Please register first.");
         return;
       }
-      if (!userToAuth.webAuthnEnabled) {
-        setErrorMsg("Biometric login is not enabled for this account. Please log in with password and enable it in Profile Settings.");
+      const isLocal = localEmails.includes(targetEmail);
+      if (!userToAuth.webAuthnEnabled || !isLocal) {
+        setErrorMsg("Biometric login has not been configured on this device for this account. Please log in with your password and enable it in Profile Settings.");
         return;
       }
     } else {
-      // Fetch local emails registered on this specific device to prevent data leaks / privacy breaches
-      let localEmails: string[] = [];
-      try {
-        const saved = localStorage.getItem('inv_local_biometric_emails');
-        localEmails = saved ? JSON.parse(saved) : [];
-      } catch (e) {}
-
       // Filter only users who have biometrics enabled AND are present in this device's local emails list
       const enabledLocalUsers = usersList.filter(u => u.webAuthnEnabled && localEmails.includes(u.email.toLowerCase()));
 
@@ -946,7 +947,11 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
                   }
                 }
 
-                const isBiometricActive = !!(activeBiometricUser && activeBiometricUser.webAuthnEnabled);
+                const isBiometricActive = !!(
+                  activeBiometricUser && 
+                  activeBiometricUser.webAuthnEnabled && 
+                  localEmails.includes(activeBiometricUser.email.toLowerCase().trim())
+                );
 
                 const handleToggleSwitch = () => {
                   if (isBiometricActive) {

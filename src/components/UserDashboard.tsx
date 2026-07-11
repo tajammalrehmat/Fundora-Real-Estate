@@ -4599,70 +4599,85 @@ ${activeViewDoc.project.description}`
             </div>
 
             {/* Quick Access & Biometric Authentication (WebAuthn) Module */}
-            <div className="bg-[#0e112d] border border-indigo-500/40 rounded-[1.25rem] p-5 shadow-xl text-white space-y-4">
-                <div className="flex items-center space-x-2.5 pb-2 border-b border-indigo-500/20">
-                  <div className="p-2 bg-indigo-500/10 rounded-xl text-indigo-400 shrink-0 border border-indigo-500/20">
-                    <Fingerprint className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-sans font-bold text-white">Quick Access (Biometric Login)</h4>
-                    <span className="text-[10px] text-indigo-200/90 font-mono">Use your device's secure fingerprint sensor or Face ID to quickly authenticate without typing passwords.</span>
-                  </div>
-                </div>
+            {(() => {
+              const isLocalBiometricEnabled = (() => {
+                if (!activeUser || !activeUser.webAuthnEnabled) return false;
+                try {
+                  const existing = localStorage.getItem('inv_local_biometric_emails');
+                  const emails = existing ? JSON.parse(existing) : [];
+                  return emails.includes(activeUser.email.toLowerCase().trim());
+                } catch (e) {
+                  return false;
+                }
+              })();
 
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-[#060819] border border-indigo-500/20 rounded-2xl gap-4">
-                  <div className="space-y-1">
-                    <span className="text-xs font-black text-white flex items-center gap-1.5">
-                      Biometric Authentication (WebAuthn API)
-                      {activeUser.webAuthnEnabled ? (
-                        <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[8.5px] uppercase font-mono tracking-wider font-extrabold">Enabled</span>
-                      ) : (
-                        <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 text-[8.5px] uppercase font-mono tracking-wider font-extrabold">Disabled</span>
-                      )}
-                    </span>
-                    <p className="text-[11px] text-indigo-300 leading-normal max-w-md">
-                      Store a cryptographic public key in your device's Secure Enclave. Biometric operations are fully client-side and secure.
-                    </p>
+              return (
+                <div className="bg-[#0e112d] border border-indigo-500/40 rounded-[1.25rem] p-5 shadow-xl text-white space-y-4">
+                  <div className="flex items-center space-x-2.5 pb-2 border-b border-indigo-500/20">
+                    <div className="p-2 bg-indigo-500/10 rounded-xl text-indigo-400 shrink-0 border border-indigo-500/20">
+                      <Fingerprint className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-sans font-bold text-white">Quick Access (Biometric Login)</h4>
+                      <span className="text-[10px] text-indigo-200/90 font-mono">Use your device's secure fingerprint sensor or Face ID to quickly authenticate without typing passwords.</span>
+                    </div>
                   </div>
 
-                  <div className="flex items-center gap-3 self-start sm:self-auto">
-                    <span className="text-[10px] text-indigo-300 font-mono font-bold hidden sm:inline">
-                      {activeUser.webAuthnEnabled ? 'Turn Off' : 'Turn On'}
-                    </span>
-                    <button
-                      onClick={() => {
-                        if (activeUser.webAuthnEnabled) {
-                          handleDisableBiometrics();
-                        } else {
-                          handleRegisterBiometrics();
-                        }
-                      }}
-                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500/20 ${
-                        activeUser.webAuthnEnabled ? 'bg-emerald-500' : 'bg-slate-800'
-                      }`}
-                    >
-                      <span
-                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
-                          activeUser.webAuthnEnabled ? 'translate-x-5' : 'translate-x-0'
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-[#060819] border border-indigo-500/20 rounded-2xl gap-4">
+                    <div className="space-y-1">
+                      <span className="text-xs font-black text-white flex items-center gap-1.5">
+                        Biometric Authentication (WebAuthn API)
+                        {isLocalBiometricEnabled ? (
+                          <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[8.5px] uppercase font-mono tracking-wider font-extrabold">Enabled</span>
+                        ) : (
+                          <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 text-[8.5px] uppercase font-mono tracking-wider font-extrabold">Disabled</span>
+                        )}
+                      </span>
+                      <p className="text-[11px] text-indigo-300 leading-normal max-w-md">
+                        Store a cryptographic public key in your device's Secure Enclave. Biometric operations are fully client-side and secure.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-3 self-start sm:self-auto">
+                      <span className="text-[10px] text-indigo-300 font-mono font-bold hidden sm:inline">
+                        {isLocalBiometricEnabled ? 'Turn Off' : 'Turn On'}
+                      </span>
+                      <button
+                        onClick={() => {
+                          if (isLocalBiometricEnabled) {
+                            handleDisableBiometrics();
+                          } else {
+                            handleRegisterBiometrics();
+                          }
+                        }}
+                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500/20 ${
+                          isLocalBiometricEnabled ? 'bg-emerald-500' : 'bg-slate-800'
                         }`}
-                      />
-                    </button>
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                            isLocalBiometricEnabled ? 'translate-x-5' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                    </div>
                   </div>
-                </div>
 
-                {activeUser.webAuthnEnabled && (
-                  <div className="p-3 bg-[#060819] border border-indigo-500/15 rounded-xl space-y-1 text-[10px] font-mono">
-                    <div className="flex justify-between text-indigo-300">
-                      <span>Credential Identifier:</span>
-                      <span className="text-white font-bold truncate max-w-[200px]">{activeUser.webAuthnCredentialId}</span>
+                  {isLocalBiometricEnabled && (
+                    <div className="p-3 bg-[#060819] border border-indigo-500/15 rounded-xl space-y-1 text-[10px] font-mono">
+                      <div className="flex justify-between text-indigo-300">
+                        <span>Credential Identifier:</span>
+                        <span className="text-white font-bold truncate max-w-[200px]">{activeUser.webAuthnCredentialId}</span>
+                      </div>
+                      <div className="flex justify-between text-indigo-300">
+                        <span>Biometric Public Key:</span>
+                        <span className="text-white font-bold truncate max-w-[200px]">{activeUser.webAuthnPublicKey}</span>
+                      </div>
                     </div>
-                    <div className="flex justify-between text-indigo-300">
-                      <span>Biometric Public Key:</span>
-                      <span className="text-white font-bold truncate max-w-[200px]">{activeUser.webAuthnPublicKey}</span>
-                    </div>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+              );
+            })()}
 
           </div>
         )}
