@@ -113,6 +113,7 @@ export default function App() {
 
   // Robust URL Hash Routing Sync using Refs to prevent infinite loop / flickering
   const activeUserRef = useRef(activeUser);
+  const isAppLockedRef = useRef(isAppLocked);
   const currentPageRef = useRef(currentPage);
   const activeDashboardTabRef = useRef(activeDashboardTab);
   const activeAdminTabRef = useRef(activeAdminTab);
@@ -120,6 +121,7 @@ export default function App() {
   const isAutoCheckingRef = useRef(false);
 
   useEffect(() => { activeUserRef.current = activeUser; }, [activeUser]);
+  useEffect(() => { isAppLockedRef.current = isAppLocked; }, [isAppLocked]);
   useEffect(() => { currentPageRef.current = currentPage; }, [currentPage]);
   useEffect(() => { activeDashboardTabRef.current = activeDashboardTab; }, [activeDashboardTab]);
   useEffect(() => { activeAdminTabRef.current = activeAdminTab; }, [activeAdminTab]);
@@ -528,12 +530,12 @@ export default function App() {
             const freshUser = users.find(u => u.id === parsed.id || u.email.toLowerCase() === parsed.email.toLowerCase());
             if (freshUser) {
               setActiveUser(freshUser);
-              if (freshUser.webAuthnEnabled) {
+              if (freshUser.webAuthnEnabled && isAppLockedRef.current) {
                 setIsAppLocked(true);
               }
             } else {
               setActiveUser(parsed);
-              if (parsed.webAuthnEnabled) {
+              if (parsed.webAuthnEnabled && isAppLockedRef.current) {
                 setIsAppLocked(true);
               }
             }

@@ -76,7 +76,16 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
       };
     }
   }, [initialScreen]);
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(() => {
+    try {
+      const saved = localStorage.getItem('inv_local_biometric_emails');
+      const localEmails = saved ? JSON.parse(saved) : [];
+      if (localEmails && localEmails.length > 0) {
+        return localEmails[0];
+      }
+    } catch (e) {}
+    return '';
+  });
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [referralCodeInput, setReferralCodeInput] = useState('');
@@ -932,7 +941,7 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
                 } else {
                   // Only consider accounts that have been registered on this specific device to prevent privacy leakage
                   const localUsers = usersList.filter(u => u.webAuthnEnabled && localEmails.includes(u.email.toLowerCase()));
-                  if (localUsers.length === 1) {
+                  if (localUsers.length >= 1) {
                     activeBiometricUser = localUsers[0];
                   }
                 }
@@ -941,10 +950,7 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
 
                 const handleToggleSwitch = () => {
                   if (isBiometricActive) {
-                    if (activeBiometricUser) {
-                      setUserToDisable(activeBiometricUser);
-                      setShowBiometricDisableConfirm(true);
-                    }
+                    handleBiometricLogin();
                   } else {
                     setShowBiometricInfoModal(true);
                   }
