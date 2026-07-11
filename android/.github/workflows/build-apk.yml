@@ -8,46 +8,41 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Java
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 21
+          java-version: '21'
 
-      - name: Setup Node
-  uses: actions/setup-node@v4
-  with:
-    node-version: '22'
-    check-latest: true
-    cache: npm
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          check-latest: true
+          cache: 'npm'
 
-- name: Check Node version
-  run: |
-    node -v
-    npm -v
-    
+      - name: Verify Node
+        run: |
+          which node
+          node -v
+          npm -v
+
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
       - name: Build Web
         run: npm run build
 
       - name: Sync Capacitor
-        run: npx cap sync android
-
-      - name: Grant Permission
-        run: chmod +x android/gradlew
+        run: npm run cap:sync
 
       - name: Build APK
         run: |
           cd android
+          chmod +x gradlew
           ./gradlew assembleDebug
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: Fundora-APK
           path: android/app/build/outputs/apk/debug/app-debug.apk
