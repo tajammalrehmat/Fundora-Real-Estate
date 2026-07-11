@@ -108,7 +108,9 @@ export default function App() {
       if (parsed && parsed.webAuthnEnabled) {
         const localSaved = localStorage.getItem('inv_local_biometric_emails');
         const localEmails = localSaved ? JSON.parse(localSaved) : [];
-        return localEmails.includes(parsed.email.toLowerCase().trim());
+        const cleanEmail = parsed.email.toLowerCase().trim();
+        return localEmails.includes(cleanEmail) &&
+               localStorage.getItem(`inv_device_biometric_active_${cleanEmail}`) === 'true';
       }
       return false;
     } catch (_) {
@@ -313,7 +315,8 @@ export default function App() {
       usdtTrc20Address: 'TX1h2A9eFm7xKsZ8Jq9wDpBcNdKyLmTqRy',
       usdtBep20Address: '0x71C7656EC7ab88b098defB751B7401B5f6d8976F',
       scanGateTitle: 'Barcode Scanning Gateway',
-      scanGateSubtitle: 'Dispatch on the matching blockchain. Tokens sent to mismatched networks are irreversibly lost.'
+      scanGateSubtitle: 'Dispatch on the matching blockchain. Tokens sent to mismatched networks are irreversibly lost.',
+      apiUrl: 'https://ais-pre-hb5de275kkaohqffdp2qfz-614235734610.asia-southeast1.run.app'
     };
   });
 

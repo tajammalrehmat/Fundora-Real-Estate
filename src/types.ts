@@ -278,6 +278,7 @@ export interface SystemSettings {
   scanGateSubtitle: string;
   usdtTrc20QrCode?: string;
   usdtBep20QrCode?: string;
+  apiUrl?: string;
 }
 
 export interface Inquiry {

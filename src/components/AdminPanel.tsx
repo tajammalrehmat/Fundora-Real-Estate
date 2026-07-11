@@ -65,7 +65,8 @@ export default function AdminPanel({
     scanGateTitle: 'Barcode Scanning Gateway',
     scanGateSubtitle: 'Dispatch on the matching blockchain. Tokens sent to mismatched networks are irreversibly lost.',
     usdtTrc20QrCode: '',
-    usdtBep20QrCode: ''
+    usdtBep20QrCode: '',
+    apiUrl: 'https://ais-pre-hb5de275kkaohqffdp2qfz-614235734610.asia-southeast1.run.app'
   },
   onUpdateSystemSettings,
   onUpdateUser,
@@ -83,6 +84,7 @@ export default function AdminPanel({
   const [bep20QrCode, setBep20QrCode] = useState<string>(systemSettings.usdtBep20QrCode || '');
   const [gateTitle, setGateTitle] = useState<string>(systemSettings.scanGateTitle);
   const [gateSubtitle, setGateSubtitle] = useState<string>(systemSettings.scanGateSubtitle);
+  const [apiUrl, setApiUrl] = useState<string>(systemSettings.apiUrl || '');
 
   React.useEffect(() => {
     setTrc20Addr(systemSettings.usdtTrc20Address || '');
@@ -91,6 +93,7 @@ export default function AdminPanel({
     setBep20QrCode(systemSettings.usdtBep20QrCode || '');
     setGateTitle(systemSettings.scanGateTitle);
     setGateSubtitle(systemSettings.scanGateSubtitle);
+    setApiUrl(systemSettings.apiUrl || '');
   }, [systemSettings]);
 
   // Admin self-password reset state
@@ -161,7 +164,8 @@ export default function AdminPanel({
         scanGateTitle: gateTitle.trim(),
         scanGateSubtitle: gateSubtitle.trim(),
         usdtTrc20QrCode: trc20QrCode.trim(),
-        usdtBep20QrCode: bep20QrCode.trim()
+        usdtBep20QrCode: bep20QrCode.trim(),
+        apiUrl: apiUrl.trim()
       });
       alert('Scanning gateway configuration successfully updated and locked into ledger!');
     }
@@ -173,6 +177,7 @@ export default function AdminPanel({
       const defaultBep20 = '0x71C7656EC7ab88b098defB751B7401B5f6d8976F';
       const defaultTitle = 'Barcode Scanning Gateway';
       const defaultSubtitle = 'Dispatch on the matching blockchain. Tokens sent to mismatched networks are irreversibly lost.';
+      const defaultApiUrl = 'https://ais-pre-hb5de275kkaohqffdp2qfz-614235734610.asia-southeast1.run.app';
 
       setTrc20Addr(defaultTrc20);
       setBep20Addr(defaultBep20);
@@ -180,6 +185,7 @@ export default function AdminPanel({
       setBep20QrCode('');
       setGateTitle(defaultTitle);
       setGateSubtitle(defaultSubtitle);
+      setApiUrl(defaultApiUrl);
 
       if (onUpdateSystemSettings) {
         onUpdateSystemSettings({
@@ -189,7 +195,8 @@ export default function AdminPanel({
           scanGateTitle: defaultTitle,
           scanGateSubtitle: defaultSubtitle,
           usdtTrc20QrCode: '',
-          usdtBep20QrCode: ''
+          usdtBep20QrCode: '',
+          apiUrl: defaultApiUrl
         });
       }
       alert('Restored defaults successfully.');
@@ -2281,6 +2288,20 @@ export default function AdminPanel({
                     className="w-full bg-slate-950 border border-slate-850 rounded-xl px-4 py-2.5 text-slate-100 font-sans text-xs focus:outline-none focus:border-red-500 focus:bg-slate-950 resize-none"
                   />
                   <span className="text-[8px] text-slate-500 block">Dispatched guidelines to ensure users select matching blockchain networks.</span>
+                </div>
+
+                {/* Production Backend API URL */}
+                <div className="space-y-1.5 font-mono">
+                  <label className="text-[10px] text-amber-500 uppercase font-bold block">Production Backend API URL</label>
+                  <input 
+                    type="url"
+                    required
+                    value={apiUrl}
+                    onChange={(e) => setApiUrl(e.target.value)}
+                    placeholder="https://ais-pre-hb5de275kkaohqffdp2qfz-614235734610.asia-southeast1.run.app"
+                    className="w-full bg-slate-950 border border-slate-850 rounded-xl px-4 py-2.5 text-slate-100 font-mono text-xs focus:outline-none focus:border-amber-500 focus:bg-slate-950"
+                  />
+                  <span className="text-[8px] text-slate-500 block">The base URL where this app's Express/Vercel endpoints (like <code>/api/analyze-receipt</code> and <code>/api/send-otp</code>) are hosted. Required for receipt auto-fetching and OTP delivery to work within compiled APKs.</span>
                 </div>
 
                 {/* Action buttons */}

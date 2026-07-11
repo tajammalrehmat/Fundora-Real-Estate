@@ -5,6 +5,7 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { NativeBiometric } from 'capacitor-native-biometric';
+import { getApiUrl } from '../utils/api';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 import { RealEstateProject, Transaction, UserAccount, InvestmentRecord, ProfitClaimRecord, getAvatarBgClass, getInvestorTier, SystemSettings } from '../types';
 import { generateReceiptPDF, generateDocumentPDF } from '../utils/pdfReceipt';
@@ -102,7 +103,8 @@ export default function UserDashboard({
     scanGateTitle: 'Barcode Scanning Gateway',
     scanGateSubtitle: 'Dispatch on the matching blockchain. Tokens sent to mismatched networks are irreversibly lost.',
     usdtTrc20QrCode: '',
-    usdtBep20QrCode: ''
+    usdtBep20QrCode: '',
+    apiUrl: 'https://ais-pre-hb5de275kkaohqffdp2qfz-614235734610.asia-southeast1.run.app'
   }
 }: UserDashboardProps) {
   // Current Tab state
@@ -978,7 +980,7 @@ export default function UserDashboard({
           const base64Data = await compressAndResizeImage(rawBase64);
           console.log("[UserDashboard] Compressed receipt size: from", Math.round(rawBase64.length / 1024), "KB to", Math.round(base64Data.length / 1024), "KB");
 
-          const response = await fetch('/api/analyze-receipt', {
+          const response = await fetch(getApiUrl('/api/analyze-receipt'), {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
