@@ -1047,72 +1047,90 @@ export default function UserDashboard({
                 }
               }
 
-              // Direct Google Generative Language REST Endpoint for Gemini 1.5 Flash (most widely compatible stable model)
-              const directUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${clientApiKey!.trim()}`;
-              
-              const directResponse = await fetch(directUrl, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  contents: [
-                    {
-                      parts: [
-                        {
-                          inlineData: {
-                            mimeType: "image/jpeg",
-                            data: cleanBase64
-                          }
-                        },
-                        {
-                          text: "Analyze this transaction receipt image. Find and extract the three fields: 'txid' (the transaction ID, transaction hash, or transfer ID), 'amount' (the sent USDT amount parsed strictly as a float number), and 'network' (the deposit blockchain network: TRC20 or BEP20 based on addresses or networks mentioned). You must return a valid JSON object matching this schema: { txid: string, amount: number, network: string }"
-                        }
-                      ]
-                    }
-                  ],
-                  generationConfig: {
-                    responseMimeType: "application/json",
-                    responseSchema: {
-                      type: "object",
-                      properties: {
-                        txid: {
-                          type: "string",
-                          description: "The transaction hash, ID or TxID from the screenshot."
-                        },
-                        amount: {
-                          type: "number",
-                          description: "The transfer amount parsed as a number."
-                        },
-                        network: {
-                          type: "string",
-                          description: "The blockchain network ('TRC20' or 'BEP20')."
-                        }
-                      },
-                      required: ["txid", "amount", "network"]
-                    }
-                  }
-                }),
-              });
+              // Try both gemini-1.5-flash and gemini-2.5-flash
+              const modelsToTry = ["gemini-1.5-flash", "gemini-2.5-flash"];
+              let lastDirectError = null;
 
-              if (!directResponse.ok) {
-                const textErr = await directResponse.text();
-                let parsedErr = textErr;
+              for (const modelName of modelsToTry) {
                 try {
-                  const parsedJson = JSON.parse(textErr);
-                  if (parsedJson?.error?.message) {
-                    parsedErr = parsedJson.error.message;
+                  console.log(`[UserDashboard] Trying direct client-side scan with ${modelName}...`);
+                  const directUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${clientApiKey!.trim()}`;
+                  
+                  const directResponse = await fetch(directUrl, {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                      contents: [
+                        {
+                          parts: [
+                            {
+                              inlineData: {
+                                mimeType: "image/jpeg",
+                                data: cleanBase64
+                              }
+                            },
+                            {
+                              text: "Analyze this transaction receipt image. Find and extract the three fields: 'txid' (the transaction ID, transaction hash, or transfer ID), 'amount' (the sent USDT amount parsed strictly as a float number), and 'network' (the deposit blockchain network: TRC20 or BEP20 based on addresses or networks mentioned). You must return a valid JSON object matching this schema: { txid: string, amount: number, network: string }"
+                            }
+                          ]
+                        }
+                      ],
+                      generationConfig: {
+                        responseMimeType: "application/json",
+                        responseSchema: {
+                          type: "object",
+                          properties: {
+                            txid: {
+                              type: "string",
+                              description: "The transaction hash, ID or TxID from the screenshot."
+                            },
+                            amount: {
+                              type: "number",
+                              description: "The transfer amount parsed as a number."
+                            },
+                            network: {
+                              type: "string",
+                              description: "The blockchain network ('TRC20' or 'BEP20')."
+                            }
+                          },
+                          required: ["txid", "amount", "network"]
+                        }
+                      }
+                    }),
+                  });
+
+                  if (!directResponse.ok) {
+                    const textErr = await directResponse.text();
+                    let parsedErr = textErr;
+                    try {
+                      const parsedJson = JSON.parse(textErr);
+                      if (parsedJson?.error?.message) {
+                        parsedErr = parsedJson.error.message;
+                      }
+                    } catch (_) {}
+                    throw new Error(`Direct Google API returned status ${directResponse.status}: ${parsedErr}`);
                   }
-                } catch (_) {}
-                throw new Error(`Direct Google API returned status ${directResponse.status}: ${parsedErr}`);
+
+                  const directJson = await directResponse.json();
+                  const textContent = directJson?.candidates?.[0]?.content?.parts?.[0]?.text;
+                  if (textContent) {
+                    resultData = JSON.parse(textContent.trim());
+                    // Success! Exit the loop
+                    lastDirectError = null;
+                    break;
+                  } else {
+                    throw new Error("Direct cloud scan did not extract content.");
+                  }
+                } catch (err: any) {
+                  console.warn(`[UserDashboard] Direct scan failed for ${modelName}:`, err);
+                  lastDirectError = err;
+                }
               }
 
-              const directJson = await directResponse.json();
-              const textContent = directJson?.candidates?.[0]?.content?.parts?.[0]?.text;
-              if (textContent) {
-                resultData = JSON.parse(textContent.trim());
-              } else {
-                throw new Error("Direct cloud scan did not extract content.");
+              if (lastDirectError) {
+                throw lastDirectError;
               }
             } else {
               // If client API key is not valid and backend fails, propagate the actual error message so the user can debug it!
