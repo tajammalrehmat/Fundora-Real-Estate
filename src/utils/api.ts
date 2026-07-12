@@ -71,37 +71,13 @@ export const getApiUrl = (path: string): string => {
   return `${defaultBaseUrl}${formattedPath}`;
 };
 
-/**
- * Rebuilds fetch options to cleanly clone headers and body.
- * Converts 'Content-Type: application/json' to 'text/plain;charset=UTF-8' for internal endpoints
- * to completely bypass browser CORS preflight (OPTIONS) blocks in mobile webviews/APKs.
- */
-const prepareOptionsForFetch = (opts: RequestInit): RequestInit => {
-  const cloned = { ...opts };
-  if (cloned.headers) {
-    const headersCopy = { ...cloned.headers } as Record<string, string>;
-    const contentTypeKey = Object.keys(headersCopy).find(k => k.toLowerCase() === 'content-type');
-    if (contentTypeKey && headersCopy[contentTypeKey].toLowerCase().includes('application/json')) {
-      headersCopy[contentTypeKey] = 'text/plain;charset=UTF-8';
-    }
-    cloned.headers = headersCopy;
-  }
-  return cloned;
-};
-
-/**
- * Smart fetch helper that automatically retries with the alternative workspace environment
- * (e.g. falls back from preview to dev, or vice versa) if the primary fetch fails or is unreachable.
- * This ensures the mobile APK can communicate with whichever server (dev or pre) is actively hosting the APIs.
- */
 export const fetchWithFallback = async (path: string, options: RequestInit = {}): Promise<Response> => {
   const primaryUrl = getApiUrl(path);
   const formattedPath = path.startsWith('/') ? path : `/${path}`;
-  const cleanOptions = prepareOptionsForFetch(options);
 
   try {
     console.log(`[API Proxy] Primary fetch attempt to: ${primaryUrl}`);
-    const response = await fetch(primaryUrl, cleanOptions);
+    const response = await fetch(primaryUrl, options);
     
     // If it's a 404 (endpoint not deployed yet) or a gateway/server offline error (>= 500), we failover
     if (!response.ok && (response.status === 404 || response.status >= 500)) {
@@ -125,7 +101,7 @@ export const fetchWithFallback = async (path: string, options: RequestInit = {})
         if (sameOriginUrl !== primaryUrl) {
           console.log(`[API Proxy] Same-origin browser fallback attempt: ${sameOriginUrl}`);
           try {
-            const fallbackResponse = await fetch(sameOriginUrl, prepareOptionsForFetch(options));
+            const fallbackResponse = await fetch(sameOriginUrl, options);
             if (fallbackResponse.ok) {
               return fallbackResponse;
             }
@@ -150,7 +126,7 @@ export const fetchWithFallback = async (path: string, options: RequestInit = {})
 
     console.log(`[API Proxy] Failover fetch attempt to: ${fallbackUrl}`);
     try {
-      const fallbackResponse = await fetch(fallbackUrl, prepareOptionsForFetch(options));
+      const fallbackResponse = await fetch(fallbackUrl, options);
       if (!fallbackResponse.ok) {
         console.warn(`[API Proxy] Fallback URL (${fallbackUrl}) returned status: ${fallbackResponse.status}`);
       }
