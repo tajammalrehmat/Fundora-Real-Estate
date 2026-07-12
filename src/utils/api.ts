@@ -45,8 +45,13 @@ export const getApiUrl = (path: string): string => {
     return `${lastKnown.trim().replace(/\/$/, '')}${formattedPath}`;
   }
 
-  // 5. Ultimate fallback to the current live URL of the platform
-  return `https://ais-pre-hb5de275kkaohqffdp2qfz-614235734610.asia-southeast1.run.app${formattedPath}`;
+  // 5. Ultimate fallback to the current live URL of the platform matching the development/production stage
+  const isDev = import.meta.env.DEV || import.meta.env.MODE === 'development';
+  const defaultBaseUrl = isDev 
+    ? 'https://ais-dev-hb5de275kkaohqffdp2qfz-614235734610.asia-southeast1.run.app'
+    : 'https://ais-pre-hb5de275kkaohqffdp2qfz-614235734610.asia-southeast1.run.app';
+    
+  return `${defaultBaseUrl}${formattedPath}`;
 };
 
 /**
@@ -62,8 +67,8 @@ export const fetchWithFallback = async (path: string, options: RequestInit = {})
     console.log(`[API Proxy] Primary fetch attempt to: ${primaryUrl}`);
     const response = await fetch(primaryUrl, options);
     
-    // If it's a gateway/server offline error or 404/502/503/504, we failover
-    if (!response.ok && response.status >= 500) {
+    // If it's a 404 (endpoint not deployed yet) or a gateway/server offline error (>= 500), we failover
+    if (!response.ok && (response.status === 404 || response.status >= 500)) {
       throw new Error(`Server returned error status: ${response.status}`);
     }
     return response;

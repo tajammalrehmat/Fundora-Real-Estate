@@ -981,8 +981,8 @@ export default function UserDashboard({
         const rawBase64 = reader.result as string;
         
         try {
-          // Downscale and compress the image to JPEG with 0.8 quality to fit within Vercel's 4.5MB payload limit
-          const base64Data = await compressAndResizeImage(rawBase64);
+          // Downscale and compress the image to 800x800 JPEG with 0.8 quality to fit under 150KB for fast mobile uploads
+          const base64Data = await compressAndResizeImage(rawBase64, 800, 800);
           console.log("[UserDashboard] Compressed receipt size: from", Math.round(rawBase64.length / 1024), "KB to", Math.round(base64Data.length / 1024), "KB");
 
           const response = await fetchWithFallback('/api/analyze-receipt', {
