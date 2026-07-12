@@ -1009,7 +1009,14 @@ export default function UserDashboard({
             });
 
             if (!response.ok) {
-              throw new Error(`Server returned status ${response.status}`);
+              let serverErrorMsg = `Server returned status ${response.status}`;
+              try {
+                const errJson = await response.json();
+                if (errJson && errJson.error) {
+                  serverErrorMsg = errJson.error;
+                }
+              } catch (_) {}
+              throw new Error(serverErrorMsg);
             }
 
             const result = await response.json();
@@ -1114,8 +1121,9 @@ export default function UserDashboard({
                 throw new Error("Direct cloud scan did not extract content.");
               }
             } else {
-              // If client API key is not valid and backend fails, explain what configuration is missing
-              throw new Error("To scan receipts inside mobile APKs, you must enter a valid 'Production Backend API URL' or a personal 'Gemini API Key' in your Admin Panel.");
+              // If client API key is not valid and backend fails, propagate the actual error message so the user can debug it!
+              const msg = backendErr?.message || String(backendErr);
+              throw new Error(msg);
             }
           }
 
