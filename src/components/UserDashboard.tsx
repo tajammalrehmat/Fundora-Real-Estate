@@ -160,6 +160,8 @@ export default function UserDashboard({
   const [depositProofInput, setDepositProofInput] = useState(''); // Text representation / simulated file
   const [depositSuccessMsg, setDepositSuccessMsg] = useState('');
   const [isAnalyzingReceipt, setIsAnalyzingReceipt] = useState(false);
+  const [scanErrorMessage, setScanErrorMessage] = useState<string | null>(null);
+  const [scanSuccessMessage, setScanSuccessMessage] = useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Withdrawal Form Info
@@ -973,6 +975,8 @@ export default function UserDashboard({
 
     setDepositProofInput(file.name);
     setIsAnalyzingReceipt(true);
+    setScanErrorMessage(null);
+    setScanSuccessMessage(null);
     showStatus(`Uploading "${file.name}" for scan...`, "info");
 
     try {
@@ -985,24 +989,117 @@ export default function UserDashboard({
           const base64Data = await compressAndResizeImage(rawBase64, 800, 800);
           console.log("[UserDashboard] Compressed receipt size: from", Math.round(rawBase64.length / 1024), "KB to", Math.round(base64Data.length / 1024), "KB");
 
-          const response = await fetchWithFallback('/api/analyze-receipt', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              base64Data,
-              mimeType: 'image/jpeg', // Force jpeg due to canvas compression format
-            }),
-          });
+          let resultData = null;
+          let scannedViaFallback = false;
 
-          if (!response.ok) {
-            throw new Error(`Server returned error status: ${response.status}`);
+          // Resolve API key from settings or Vite public env
+          const clientApiKey = systemSettings?.geminiApiKey || import.meta.env.VITE_GEMINI_API_KEY;
+
+          try {
+            console.log("[UserDashboard] Sending to backend receiver /api/analyze-receipt...");
+            const response = await fetchWithFallback('/api/analyze-receipt', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                base64Data,
+                mimeType: 'image/jpeg', // Force jpeg due to canvas compression format
+              }),
+            });
+
+            if (!response.ok) {
+              throw new Error(`Server returned status ${response.status}`);
+            }
+
+            const result = await response.json();
+            if (result.success && result.data) {
+              resultData = result.data;
+            } else {
+              throw new Error(result.error || "Empty response from backend");
+            }
+          } catch (backendErr: any) {
+            console.warn("[UserDashboard] Primary backend analysis failed or was session-blocked:", backendErr);
+
+            if (clientApiKey) {
+              console.log("[UserDashboard] Initiating high-speed direct client-side Gemini scan...");
+              scannedViaFallback = true;
+
+              let cleanBase64 = base64Data;
+              if (base64Data.startsWith("data:")) {
+                const parts = base64Data.split(";base64,");
+                if (parts.length === 2) {
+                  cleanBase64 = parts[1];
+                }
+              }
+
+              // Direct Google Generative Language REST Endpoint for Gemini 2.5 Flash
+              const directUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${clientApiKey}`;
+              
+              const directResponse = await fetch(directUrl, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  contents: [
+                    {
+                      parts: [
+                        {
+                          inlineData: {
+                            mimeType: "image/jpeg",
+                            data: cleanBase64
+                          }
+                        },
+                        {
+                          text: "Analyze this transaction receipt image. Find and extract the three fields: 'txid' (the transaction ID, transaction hash, or transfer ID), 'amount' (the sent USDT amount parsed strictly as a float number), and 'network' (the deposit blockchain network: TRC20 or BEP20 based on addresses or networks mentioned). You must return a valid JSON object matching this schema: { txid: string, amount: number, network: string }"
+                        }
+                      ]
+                    }
+                  ],
+                  generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                      type: "OBJECT",
+                      properties: {
+                        txid: {
+                          type: "STRING",
+                          description: "The transaction hash, ID or TxID from the screenshot."
+                        },
+                        amount: {
+                          type: "NUMBER",
+                          description: "The transfer amount parsed as a number."
+                        },
+                        network: {
+                          type: "STRING",
+                          description: "The blockchain network ('TRC20' or 'BEP20')."
+                        }
+                      },
+                      required: ["txid", "amount", "network"]
+                    }
+                  }
+                }),
+              });
+
+              if (!directResponse.ok) {
+                const textErr = await directResponse.text();
+                throw new Error(`Direct Google API returned status ${directResponse.status}: ${textErr}`);
+              }
+
+              const directJson = await directResponse.json();
+              const textContent = directJson?.candidates?.[0]?.content?.parts?.[0]?.text;
+              if (textContent) {
+                resultData = JSON.parse(textContent.trim());
+              } else {
+                throw new Error("Direct cloud scan did not extract content.");
+              }
+            } else {
+              throw backendErr;
+            }
           }
 
-          const result = await response.json();
-          if (result.success && result.data) {
-            const { txid, amount, network } = result.data;
+          if (resultData) {
+            const { txid, amount, network } = resultData;
             let matchMessage = "";
 
             if (txid) {
@@ -1013,7 +1110,7 @@ export default function UserDashboard({
             if (amount !== undefined && amount !== null) {
               let parsedAmount = amount;
               if (typeof amount === 'string') {
-                const cleaned = amount.replace(/[^\d.]/g, '');
+                const cleaned = (amount as string).replace(/[^\d.]/g, '');
                 parsedAmount = parseFloat(cleaned);
               }
               if (!isNaN(parsedAmount) && parsedAmount > 0) {
@@ -1034,18 +1131,27 @@ export default function UserDashboard({
             }
 
             if (matchMessage) {
-              showStatus(`✨ AI auto-fetched: ${matchMessage} from screenshot!`, "success");
+              const successText = scannedViaFallback 
+                ? `✨ Cloud Direct Auto-fetched: ${matchMessage}` 
+                : `✨ AI Auto-fetched: ${matchMessage}`;
+              setScanSuccessMessage(successText);
+              showStatus(successText, "success");
             } else {
-              showStatus(`✓ Image "${file.name}" uploaded. No specific details were auto-extracted.`, "success");
+              const noDataText = `✓ Screenshot attached. No specific transaction values were found.`;
+              setScanErrorMessage(noDataText);
+              showStatus(noDataText, "info");
             }
           } else {
-            showStatus(`✓ Image "${file.name}" uploaded as payment proof.`, "success");
+            const uploadedText = `✓ Screenshot attached as payment proof.`;
+            setScanSuccessMessage(uploadedText);
+            showStatus(uploadedText, "success");
           }
         } catch (apiErr: any) {
           console.error("API error during receipt analysis:", apiErr);
-          // Show actual error details to help the user understand why it failed
           const errMsg = apiErr.message || String(apiErr);
-          showStatus(`✓ Attached. (AI auto-fetch unavailable: ${errMsg.slice(0, 60)})`, "info");
+          const failText = `Proof attached. Auto-fetch was unavailable: ${errMsg.slice(0, 80)}.`;
+          setScanErrorMessage(failText);
+          showStatus(`✓ Attached. (AI auto-fetch unavailable)`, "info");
         } finally {
           setIsAnalyzingReceipt(false);
         }
@@ -3180,6 +3286,28 @@ ${activeViewDoc.project.description}`
                         />
                       </div>
                     </div>
+
+                    {/* Scan Status Banners */}
+                    {scanSuccessMessage && (
+                      <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-200 text-[10px] font-sans flex items-start gap-2 animate-fadeIn">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                        <div>
+                          <p className="font-bold uppercase tracking-wider text-[8.5px] text-emerald-400">Scanner Success</p>
+                          <p className="text-emerald-300/90 leading-normal mt-0.5">{scanSuccessMessage}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {scanErrorMessage && (
+                      <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-200 text-[10px] font-sans flex items-start gap-2 animate-fadeIn">
+                        <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                        <div>
+                          <p className="font-bold uppercase tracking-wider text-[8.5px] text-amber-400">Scanner Advisory</p>
+                          <p className="text-amber-300/90 leading-normal mt-0.5">{scanErrorMessage}</p>
+                          <p className="text-[7.5px] text-slate-400 mt-1">If auto-fill is blocked, you can write the values manually from your receipt image. The administration team will verify and approve them.</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* SUBMISSION ACTION */}

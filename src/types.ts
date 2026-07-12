@@ -279,6 +279,7 @@ export interface SystemSettings {
   usdtTrc20QrCode?: string;
   usdtBep20QrCode?: string;
   apiUrl?: string;
+  geminiApiKey?: string;
 }
 
 export interface Inquiry {
