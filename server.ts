@@ -180,9 +180,21 @@ If you didn't request this verification, simply ignore this email.
 
     try {
       // 1. Initialize GoogleGenAI client (lazy initialization)
-      const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.VITE_GEMINI_API_KEY;
+      let apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.VITE_GEMINI_API_KEY;
+      
+      const isKeyValid = (key: string | undefined): boolean => {
+        if (!key) return false;
+        const clean = key.trim();
+        // A valid Google Cloud API Key always starts with 'AIzaSy' and is at least 20 chars long
+        return clean.startsWith('AIzaSy') && clean.length > 20;
+      };
+
+      if (!isKeyValid(apiKey)) {
+        apiKey = undefined;
+      }
+
       if (!apiKey) {
-        console.warn("GEMINI_API_KEY environment variable is not set. Using simulated receipt analyzer logic.");
+        console.warn("GEMINI_API_KEY environment variable is not set or is an invalid placeholder. Using simulated receipt analyzer logic.");
         return res.json({
           success: true,
           simulated: true,

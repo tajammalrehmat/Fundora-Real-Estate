@@ -1030,15 +1030,9 @@ export default function UserDashboard({
 
             const isKeyValid = (key: string | undefined): boolean => {
               if (!key) return false;
-              const clean = key.trim().toLowerCase();
-              return (
-                clean.length > 10 && 
-                !clean.includes('placeholder') && 
-                !clean.includes('your_') && 
-                !clean.includes('ai_studio_') &&
-                !clean.includes('undefined') &&
-                !clean.includes('null')
-              );
+              const clean = key.trim();
+              // A valid Google Cloud API Key always starts with 'AIzaSy' and is at least 20 chars long
+              return clean.startsWith('AIzaSy') && clean.length > 20;
             };
 
             if (isKeyValid(clientApiKey)) {
