@@ -25,35 +25,49 @@ export const getApiUrl = (path: string): string => {
     } catch (_) {}
   }
 
-  // 3. Fallback: If running in a regular web browser (NOT a Capacitor native webview/APK),
+  // Define fallback URLs for Dev and Pre/Prod
+  const devUrl = 'https://ais-dev-hb5de275kkaohqffdp2qfz-614235734610.asia-southeast1.run.app';
+  const preUrl = 'https://ais-pre-hb5de275kkaohqffdp2qfz-614235734610.asia-southeast1.run.app';
+  const isDev = import.meta.env.DEV || import.meta.env.MODE === 'development';
+  const defaultBaseUrl = isDev ? devUrl : preUrl;
+
+  // 3. Fallback: If running in a regular web browser (NOT a Capacitor native webview/APK/local page),
   // we can use the current browser's origin. This ensures perfect CORS compliance when no custom URL is configured.
   if (typeof window !== 'undefined' && window.location) {
-    const origin = window.location.origin;
+    const origin = window.location.origin || '';
+    const host = window.location.host || '';
+
+    // Check Capacitor or native platform bridge
     const isCapacitor = !!((window as any).Capacitor && (
       (window as any).Capacitor.isNative || 
       ((window as any).Capacitor.getPlatform && (window as any).Capacitor.getPlatform() !== 'web')
     ));
-    const isLocalFile = origin.startsWith('file:') || origin.startsWith('capacitor:') || origin.startsWith('app:');
     
-    if (!isCapacitor && !isLocalFile && origin.startsWith('http')) {
-      // Save this origin as a cached fallback so the APK has it if needed later
+    // Check local protocols/schemas
+    const isLocalFile = origin.startsWith('file:') || origin.startsWith('capacitor:') || origin.startsWith('app:') || origin.startsWith('ionic:');
+    
+    // Detect mobile/local WebViews that run on localhost but are NOT actual developer instances.
+    // If running in production mode, any localhost or 127.0.0.1 is definitely a mobile webview container!
+    const isLocalHost = host.includes('localhost') || host.includes('127.0.0.1');
+    const isWebViewLocalhost = isLocalHost && !isDev;
+
+    const isNativeOrHybrid = isCapacitor || isLocalFile || isWebViewLocalhost;
+
+    // Only use origin as API base URL if we are in a normal web browser and NOT a native hybrid container.
+    // Also, we want to save this origin to cached fallback only if it's a real live cloud domain (starts with http and is not localhost).
+    if (!isNativeOrHybrid && origin.startsWith('http') && !isLocalHost) {
       localStorage.setItem('inv_last_known_web_origin', origin);
       return `${origin}${formattedPath}`;
     }
   }
 
-  // 4. Fallback to last known web origin saved in localStorage
+  // 4. Fallback to last known web origin saved in localStorage (making sure it's not a localhost address)
   const lastKnown = localStorage.getItem('inv_last_known_web_origin');
-  if (lastKnown) {
+  if (lastKnown && !lastKnown.includes('localhost') && !lastKnown.includes('127.0.0.1')) {
     return `${lastKnown.trim().replace(/\/$/, '')}${formattedPath}`;
   }
 
   // 5. Ultimate fallback to the current live URL of the platform matching the development/production stage
-  const isDev = import.meta.env.DEV || import.meta.env.MODE === 'development';
-  const defaultBaseUrl = isDev 
-    ? 'https://ais-dev-hb5de275kkaohqffdp2qfz-614235734610.asia-southeast1.run.app'
-    : 'https://ais-pre-hb5de275kkaohqffdp2qfz-614235734610.asia-southeast1.run.app';
-    
   return `${defaultBaseUrl}${formattedPath}`;
 };
 
