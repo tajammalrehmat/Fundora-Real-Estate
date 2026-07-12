@@ -6,33 +6,36 @@ export const getApiUrl = (path: string): string => {
   // Ensure path starts with a slash
   const formattedPath = path.startsWith('/') ? path : `/${path}`;
 
-  // 1. Check if there's a VITE_API_URL environment variable baked in
+  // 1. High priority: Check if there's a VITE_API_URL environment variable baked in
   const envApiUrl = (import.meta.env.VITE_API_URL || '').trim();
   if (envApiUrl) {
     return `${envApiUrl.replace(/\/$/, '')}${formattedPath}`;
   }
 
-  // 2. Check systemSettings for a configured API URL saved in localStorage
+  // 2. High priority: Check systemSettings for a configured API URL saved in localStorage
+  // This is set in the Admin Panel as 'Production Backend API URL'. If defined, we MUST respect it
+  // because the app might be hosted as static files on another origin.
   const savedSettings = localStorage.getItem('inv_system_settings');
   if (savedSettings) {
     try {
       const parsed = JSON.parse(savedSettings);
-      if (parsed.apiUrl) {
+      if (parsed.apiUrl && parsed.apiUrl.trim().length > 10) {
         return `${parsed.apiUrl.trim().replace(/\/$/, '')}${formattedPath}`;
       }
     } catch (_) {}
   }
 
-  // 3. If running on a web origin that is NOT localhost inside a native webview,
-  // we can use the current browser's origin.
+  // 3. Fallback: If running in a regular web browser (NOT a Capacitor native webview/APK),
+  // we can use the current browser's origin. This ensures perfect CORS compliance when no custom URL is configured.
   if (typeof window !== 'undefined' && window.location) {
     const origin = window.location.origin;
     const isCapacitor = !!((window as any).Capacitor && (
       (window as any).Capacitor.isNative || 
       ((window as any).Capacitor.getPlatform && (window as any).Capacitor.getPlatform() !== 'web')
     ));
+    const isLocalFile = origin.startsWith('file:') || origin.startsWith('capacitor:') || origin.startsWith('app:');
     
-    if (!isCapacitor && !origin.includes('localhost') && origin.startsWith('http')) {
+    if (!isCapacitor && !isLocalFile && origin.startsWith('http')) {
       // Save this origin as a cached fallback so the APK has it if needed later
       localStorage.setItem('inv_last_known_web_origin', origin);
       return `${origin}${formattedPath}`;
@@ -74,6 +77,31 @@ export const fetchWithFallback = async (path: string, options: RequestInit = {})
     return response;
   } catch (err: any) {
     console.warn(`[API Proxy] Primary URL (${primaryUrl}) unreachable or failed: ${err.message || err}. Initiating smart environment failover...`);
+
+    // In a browser, try falling back to the SAME ORIGIN first if we didn't already try it
+    if (typeof window !== 'undefined' && window.location) {
+      const origin = window.location.origin;
+      const isCapacitor = !!((window as any).Capacitor && (
+        (window as any).Capacitor.isNative || 
+        ((window as any).Capacitor.getPlatform && (window as any).Capacitor.getPlatform() !== 'web')
+      ));
+      const isLocalFile = origin.startsWith('file:') || origin.startsWith('capacitor:') || origin.startsWith('app:');
+      
+      if (!isCapacitor && !isLocalFile && origin.startsWith('http')) {
+        const sameOriginUrl = `${origin}${formattedPath}`;
+        if (sameOriginUrl !== primaryUrl) {
+          console.log(`[API Proxy] Same-origin browser fallback attempt: ${sameOriginUrl}`);
+          try {
+            const fallbackResponse = await fetch(sameOriginUrl, options);
+            if (fallbackResponse.ok) {
+              return fallbackResponse;
+            }
+          } catch (fallbackErr: any) {
+            console.warn(`[API Proxy] Same-origin fallback failed:`, fallbackErr);
+          }
+        }
+      }
+    }
 
     const devUrl = 'https://ais-dev-hb5de275kkaohqffdp2qfz-614235734610.asia-southeast1.run.app';
     const preUrl = 'https://ais-pre-hb5de275kkaohqffdp2qfz-614235734610.asia-southeast1.run.app';

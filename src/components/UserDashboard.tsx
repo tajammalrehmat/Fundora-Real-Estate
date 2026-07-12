@@ -1021,7 +1021,20 @@ export default function UserDashboard({
           } catch (backendErr: any) {
             console.warn("[UserDashboard] Primary backend analysis failed or was session-blocked:", backendErr);
 
-            if (clientApiKey) {
+            const isKeyValid = (key: string | undefined): boolean => {
+              if (!key) return false;
+              const clean = key.trim().toLowerCase();
+              return (
+                clean.length > 10 && 
+                !clean.includes('placeholder') && 
+                !clean.includes('your_') && 
+                !clean.includes('ai_studio_') &&
+                !clean.includes('undefined') &&
+                !clean.includes('null')
+              );
+            };
+
+            if (isKeyValid(clientApiKey)) {
               console.log("[UserDashboard] Initiating high-speed direct client-side Gemini scan...");
               scannedViaFallback = true;
 
@@ -1034,7 +1047,7 @@ export default function UserDashboard({
               }
 
               // Direct Google Generative Language REST Endpoint for Gemini 1.5 Flash (most widely compatible stable model)
-              const directUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${clientApiKey}`;
+              const directUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${clientApiKey!.trim()}`;
               
               const directResponse = await fetch(directUrl, {
                 method: "POST",
@@ -1060,18 +1073,18 @@ export default function UserDashboard({
                   generationConfig: {
                     responseMimeType: "application/json",
                     responseSchema: {
-                      type: "OBJECT",
+                      type: "object",
                       properties: {
                         txid: {
-                          type: "STRING",
+                          type: "string",
                           description: "The transaction hash, ID or TxID from the screenshot."
                         },
                         amount: {
-                          type: "NUMBER",
+                          type: "number",
                           description: "The transfer amount parsed as a number."
                         },
                         network: {
-                          type: "STRING",
+                          type: "string",
                           description: "The blockchain network ('TRC20' or 'BEP20')."
                         }
                       },
@@ -1083,7 +1096,14 @@ export default function UserDashboard({
 
               if (!directResponse.ok) {
                 const textErr = await directResponse.text();
-                throw new Error(`Direct Google API returned status ${directResponse.status}: ${textErr}`);
+                let parsedErr = textErr;
+                try {
+                  const parsedJson = JSON.parse(textErr);
+                  if (parsedJson?.error?.message) {
+                    parsedErr = parsedJson.error.message;
+                  }
+                } catch (_) {}
+                throw new Error(`Direct Google API returned status ${directResponse.status}: ${parsedErr}`);
               }
 
               const directJson = await directResponse.json();
@@ -1094,7 +1114,8 @@ export default function UserDashboard({
                 throw new Error("Direct cloud scan did not extract content.");
               }
             } else {
-              throw backendErr;
+              // If client API key is not valid and backend fails, explain what configuration is missing
+              throw new Error("To scan receipts inside mobile APKs, you must enter a valid 'Production Backend API URL' or a personal 'Gemini API Key' in your Admin Panel.");
             }
           }
 
