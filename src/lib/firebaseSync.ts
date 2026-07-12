@@ -304,7 +304,8 @@ export const loadSystemSettingsFromFirebase = async (): Promise<SystemSettings> 
     usdtTrc20Address: 'TX1h2A9eFm7xKsZ8Jq9wDpBcNdKyLmTqRy',
     usdtBep20Address: '0x71C7656EC7ab88b098defB751B7401B5f6d8976F',
     scanGateTitle: 'Barcode Scanning Gateway',
-    scanGateSubtitle: 'Dispatch on the matching blockchain. Tokens sent to mismatched networks are irreversibly lost.'
+    scanGateSubtitle: 'Dispatch on the matching blockchain. Tokens sent to mismatched networks are irreversibly lost.',
+    apiUrl: 'https://ais-pre-hb5de275kkaohqffdp2qfz-614235734610.asia-southeast1.run.app'
   };
 
   if (!isFirebaseEnabled()) return defaultSettings;
@@ -312,7 +313,11 @@ export const loadSystemSettingsFromFirebase = async (): Promise<SystemSettings> 
     const docRef = doc(db, 'system_settings', 'default');
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
-      return docSnap.data() as SystemSettings;
+      const data = docSnap.data() as SystemSettings;
+      if (!data.apiUrl || data.apiUrl.trim().length < 10) {
+        data.apiUrl = defaultSettings.apiUrl;
+      }
+      return data;
     } else {
       await setDoc(docRef, defaultSettings);
       return defaultSettings;

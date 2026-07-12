@@ -33,6 +33,31 @@ async function startServer() {
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
+  // Custom text/plain parser to support preflight-free JSON payloads from mobile APKs
+  app.use((req, res, next) => {
+    const contentType = req.headers["content-type"];
+    if (contentType && (contentType.includes("text/plain") || contentType.includes("text/plain;charset=UTF-8"))) {
+      let data = "";
+      req.on("data", chunk => {
+        data += chunk;
+      });
+      req.on("end", () => {
+        try {
+          const trimmed = data.trim();
+          if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+            req.body = JSON.parse(trimmed);
+          }
+          next();
+        } catch (err) {
+          console.warn("[Server text/plain Parser] Failed to parse text/plain body as JSON:", err);
+          next();
+        }
+      });
+    } else {
+      next();
+    }
+  });
+
   // API Route to proxy Resend Email requests (Bypasses browser CORS policy)
   app.post("/api/send-otp", async (req, res) => {
     const { toEmail, toName, otpCode } = req.body;

@@ -310,7 +310,16 @@ export default function App() {
 
   const [systemSettings, setSystemSettings] = useState<SystemSettings>(() => {
     const saved = localStorage.getItem('inv_system_settings');
-    return saved ? JSON.parse(saved) : {
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (!parsed.apiUrl || parsed.apiUrl.trim().length < 10) {
+          parsed.apiUrl = 'https://ais-pre-hb5de275kkaohqffdp2qfz-614235734610.asia-southeast1.run.app';
+        }
+        return parsed;
+      } catch (_) {}
+    }
+    return {
       id: 'default',
       usdtTrc20Address: 'TX1h2A9eFm7xKsZ8Jq9wDpBcNdKyLmTqRy',
       usdtBep20Address: '0x71C7656EC7ab88b098defB751B7401B5f6d8976F',
