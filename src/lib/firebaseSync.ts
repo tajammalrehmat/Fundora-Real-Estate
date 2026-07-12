@@ -140,20 +140,20 @@ export const seedInitialDataIfEmpty = async () => {
 };
 
 // Generic Load functions (can be used to pull initial snapshots or fall back to local storage)
-export const loadProjectsFromFirebase = async (): Promise<RealEstateProject[]> => {
-  if (!isFirebaseEnabled()) return INITIAL_PROJECTS;
+export const loadProjectsFromFirebase = async (): Promise<RealEstateProject[] | null> => {
+  if (!isFirebaseEnabled()) return null;
   try {
     const snapshot = await getDocs(collection(db, 'projects'));
     if (snapshot.empty) return INITIAL_PROJECTS;
     return snapshot.docs.map(d => d.data() as RealEstateProject);
   } catch (e) {
     console.error('Error loading projects from Firebase:', e);
-    return INITIAL_PROJECTS;
+    return null;
   }
 };
 
-export const loadUsersFromFirebase = async (): Promise<UserAccount[]> => {
-  if (!isFirebaseEnabled()) return [INITIAL_USER, INITIAL_ADMIN];
+export const loadUsersFromFirebase = async (): Promise<UserAccount[] | null> => {
+  if (!isFirebaseEnabled()) return null;
   try {
     const snapshot = await getDocs(collection(db, 'users'));
     if (snapshot.empty) return [INITIAL_USER, INITIAL_ADMIN];
@@ -180,12 +180,12 @@ export const loadUsersFromFirebase = async (): Promise<UserAccount[]> => {
     return migratedUsers;
   } catch (e) {
     console.error('Error loading users from Firebase:', e);
-    return [INITIAL_USER, INITIAL_ADMIN];
+    return null;
   }
 };
 
-export const loadTransactionsFromFirebase = async (): Promise<Transaction[]> => {
-  if (!isFirebaseEnabled()) return INITIAL_TRANSACTIONS;
+export const loadTransactionsFromFirebase = async (): Promise<Transaction[] | null> => {
+  if (!isFirebaseEnabled()) return null;
   try {
     const snapshot = await getDocs(collection(db, 'transactions'));
     if (snapshot.empty) return INITIAL_TRANSACTIONS;
@@ -194,34 +194,34 @@ export const loadTransactionsFromFirebase = async (): Promise<Transaction[]> => 
     return txs.sort((a, b) => b.date.localeCompare(a.date));
   } catch (e) {
     console.error('Error loading transactions from Firebase:', e);
-    return INITIAL_TRANSACTIONS;
+    return null;
   }
 };
 
-export const loadInvestmentsFromFirebase = async (): Promise<InvestmentRecord[]> => {
-  if (!isFirebaseEnabled()) return [];
+export const loadInvestmentsFromFirebase = async (): Promise<InvestmentRecord[] | null> => {
+  if (!isFirebaseEnabled()) return null;
   try {
     const snapshot = await getDocs(collection(db, 'investments'));
     return snapshot.docs.map(d => d.data() as InvestmentRecord);
   } catch (e) {
     console.error('Error loading investments from Firebase:', e);
-    return [];
+    return null;
   }
 };
 
-export const loadClaimsFromFirebase = async (): Promise<ProfitClaimRecord[]> => {
-  if (!isFirebaseEnabled()) return [];
+export const loadClaimsFromFirebase = async (): Promise<ProfitClaimRecord[] | null> => {
+  if (!isFirebaseEnabled()) return null;
   try {
     const snapshot = await getDocs(collection(db, 'claims'));
     return snapshot.docs.map(d => d.data() as ProfitClaimRecord);
   } catch (e) {
     console.error('Error loading claims from Firebase:', e);
-    return [];
+    return null;
   }
 };
 
-export const loadSecurityLogsFromFirebase = async (): Promise<SecurityLog[]> => {
-  if (!isFirebaseEnabled()) return INITIAL_SECURITY_LOGS;
+export const loadSecurityLogsFromFirebase = async (): Promise<SecurityLog[] | null> => {
+  if (!isFirebaseEnabled()) return null;
   try {
     const snapshot = await getDocs(collection(db, 'security_logs'));
     if (snapshot.empty) return INITIAL_SECURITY_LOGS;
@@ -229,7 +229,7 @@ export const loadSecurityLogsFromFirebase = async (): Promise<SecurityLog[]> => 
     return logs.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
   } catch (e) {
     console.error('Error loading security logs from Firebase:', e);
-    return INITIAL_SECURITY_LOGS;
+    return null;
   }
 };
 
@@ -298,7 +298,7 @@ export const deleteProjectFromFirebase = async (id: string) => {
   }
 };
 
-export const loadSystemSettingsFromFirebase = async (): Promise<SystemSettings> => {
+export const loadSystemSettingsFromFirebase = async (): Promise<SystemSettings | null> => {
   const defaultSettings: SystemSettings = {
     id: 'default',
     usdtTrc20Address: 'TX1h2A9eFm7xKsZ8Jq9wDpBcNdKyLmTqRy',
@@ -308,7 +308,7 @@ export const loadSystemSettingsFromFirebase = async (): Promise<SystemSettings> 
     apiUrl: 'https://ais-pre-hb5de275kkaohqffdp2qfz-614235734610.asia-southeast1.run.app'
   };
 
-  if (!isFirebaseEnabled()) return defaultSettings;
+  if (!isFirebaseEnabled()) return null;
   try {
     const docRef = doc(db, 'system_settings', 'default');
     const docSnap = await getDoc(docRef);
@@ -324,7 +324,7 @@ export const loadSystemSettingsFromFirebase = async (): Promise<SystemSettings> 
     }
   } catch (e) {
     console.error('Error loading system settings from Firebase:', e);
-    return defaultSettings;
+    return null;
   }
 };
 
@@ -337,8 +337,8 @@ export const saveSystemSettingsToFirebase = async (settings: SystemSettings) => 
   }
 };
 
-export const loadInquiriesFromFirebase = async (): Promise<Inquiry[]> => {
-  if (!isFirebaseEnabled()) return [];
+export const loadInquiriesFromFirebase = async (): Promise<Inquiry[] | null> => {
+  if (!isFirebaseEnabled()) return null;
   try {
     const snapshot = await getDocs(collection(db, 'inquiries'));
     if (snapshot.empty) return [];
@@ -346,7 +346,7 @@ export const loadInquiriesFromFirebase = async (): Promise<Inquiry[]> => {
     return inquiries.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
   } catch (e) {
     console.error('Error loading inquiries from Firebase:', e);
-    return [];
+    return null;
   }
 };
 

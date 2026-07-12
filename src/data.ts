@@ -68,7 +68,7 @@ export const INITIAL_ADMIN: UserAccount = {
   email: 'no-reply@fundora.one',
   name: 'Platform Administrator',
   role: 'admin',
-  password: 'admin123',
+  password: 'Abbottabad@123',
   referralCode: 'FUNDORA_HQ',
   wallet: {
     usdtTrc20Address: '',

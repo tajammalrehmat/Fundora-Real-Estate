@@ -514,37 +514,54 @@ export default function App() {
           loadInquiriesFromFirebase()
         ]);
 
-        let filteredProjects = projects || [];
-        const originalDeletedIds = ['proj-1', 'proj-2', 'proj-4', 'proj-5', 'proj-7'];
-        const hasLegacyDeleted = filteredProjects.some(p => originalDeletedIds.includes(p.id));
-        
-        if (hasLegacyDeleted) {
-          console.log("Cleaning up legacy deleted projects from Firestore...");
-          for (const id of originalDeletedIds) {
-            await deleteProjectFromFirebase(id);
+        if (projects !== null) {
+          let filteredProjects = projects || [];
+          const originalDeletedIds = ['proj-1', 'proj-2', 'proj-4', 'proj-5', 'proj-7'];
+          const hasLegacyDeleted = filteredProjects.some(p => originalDeletedIds.includes(p.id));
+          
+          if (hasLegacyDeleted) {
+            console.log("Cleaning up legacy deleted projects from Firestore...");
+            for (const id of originalDeletedIds) {
+              await deleteProjectFromFirebase(id);
+            }
+            filteredProjects = filteredProjects.filter(p => !originalDeletedIds.includes(p.id));
           }
-          filteredProjects = filteredProjects.filter(p => !originalDeletedIds.includes(p.id));
+
+          if (filteredProjects && filteredProjects.length > 0) {
+            setProjectsList(filteredProjects);
+          } else {
+            setProjectsList(INITIAL_PROJECTS);
+          }
         }
 
-        if (filteredProjects && filteredProjects.length > 0) {
-          setProjectsList(filteredProjects);
-        } else {
-          setProjectsList(INITIAL_PROJECTS);
+        if (users !== null && users.length > 0) {
+          setUsersListState(prev => {
+            const merged = [...prev];
+            users.forEach(fbUser => {
+              const idx = merged.findIndex(u => u.email.toLowerCase() === fbUser.email.toLowerCase());
+              if (idx > -1) {
+                // Merge database record over local copy, prioritizing cloud details
+                merged[idx] = { ...merged[idx], ...fbUser };
+              } else {
+                merged.push(fbUser);
+              }
+            });
+            return merged;
+          });
         }
-        if (users && users.length > 0) setUsersListState(users);
-        if (transactions) setTransactionsList(transactions);
-        if (investments) setInvestmentsList(investments);
-        if (claims) setClaimsHistory(claims);
-        if (logs) setSecurityLogsList(logs);
-        if (settings) setSystemSettings(settings);
-        if (inquiries) setInquiriesList(inquiries);
+        if (transactions !== null) setTransactionsList(transactions);
+        if (investments !== null) setInvestmentsList(investments);
+        if (claims !== null) setClaimsHistory(claims);
+        if (logs !== null) setSecurityLogsList(logs);
+        if (settings !== null) setSystemSettings(settings);
+        if (inquiries !== null) setInquiriesList(inquiries);
 
         // Also update active user from the fresh database if there was one saved in localStorage
         const savedActiveUser = localStorage.getItem('inv_active_user');
         if (savedActiveUser) {
           try {
             const parsed = JSON.parse(savedActiveUser);
-            const freshUser = users.find(u => u.id === parsed.id || u.email.toLowerCase() === parsed.email.toLowerCase());
+            const freshUser = users ? users.find(u => u.id === parsed.id || u.email.toLowerCase() === parsed.email.toLowerCase()) : null;
             if (freshUser) {
               setActiveUser(freshUser);
               const isLocalActive = localStorage.getItem(`inv_device_biometric_active_${freshUser.email.toLowerCase().trim()}`) === 'true';
