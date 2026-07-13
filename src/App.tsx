@@ -538,7 +538,7 @@ export default function App() {
           setUsersListState(prev => {
             const merged = [...prev];
             users.forEach(fbUser => {
-              const idx = merged.findIndex(u => u.email.toLowerCase() === fbUser.email.toLowerCase());
+              const idx = merged.findIndex(u => u.email.trim().toLowerCase() === fbUser.email.trim().toLowerCase());
               if (idx > -1) {
                 // Merge database record over local copy, prioritizing cloud details
                 merged[idx] = { ...merged[idx], ...fbUser };
@@ -769,9 +769,9 @@ export default function App() {
 
     // Save/update global users list
     setUsersListState(prev => {
-      const exists = prev.some(u => u.email.toLowerCase() === userAccount.email.toLowerCase());
+      const exists = prev.some(u => u.email.trim().toLowerCase() === userAccount.email.trim().toLowerCase());
       if (exists) {
-        return prev.map(u => u.email.toLowerCase() === userAccount.email.toLowerCase() ? { ...u, ...userAccount } : u);
+        return prev.map(u => u.email.trim().toLowerCase() === userAccount.email.trim().toLowerCase() ? { ...u, ...userAccount } : u);
       }
       return [...prev, userAccount];
     });
@@ -789,9 +789,9 @@ export default function App() {
   // Add pending register user to usersListState to allow resumption
   const handleRegisterPending = (pendingUser: UserAccount) => {
     setUsersListState(prev => {
-      const exists = prev.some(u => u.email.toLowerCase() === pendingUser.email.toLowerCase());
+      const exists = prev.some(u => u.email.trim().toLowerCase() === pendingUser.email.trim().toLowerCase());
       if (exists) {
-        return prev.map(u => u.email.toLowerCase() === pendingUser.email.toLowerCase() ? { ...u, ...pendingUser } : u);
+        return prev.map(u => u.email.trim().toLowerCase() === pendingUser.email.trim().toLowerCase() ? { ...u, ...pendingUser } : u);
       }
       return [...prev, pendingUser];
     });
@@ -801,7 +801,7 @@ export default function App() {
 
   const handleResetPassword = (email: string, newPassword: string) => {
     setUsersListState(prev => prev.map(u => {
-      if (u.email.toLowerCase() === email.toLowerCase()) {
+      if (u.email.trim().toLowerCase() === email.trim().toLowerCase()) {
         const updatedU = { ...u, password: newPassword };
         saveAndSyncUser(updatedU);
         return updatedU;

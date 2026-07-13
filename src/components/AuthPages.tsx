@@ -270,7 +270,7 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
     } catch (e) {}
 
     if (targetEmail) {
-      userToAuth = usersList.find(u => u.email.toLowerCase() === targetEmail);
+      userToAuth = usersList.find(u => u.email.trim().toLowerCase() === targetEmail);
       if (!userToAuth) {
         setErrorMsg("This email address is not registered in our database. Please register first.");
         return;
@@ -283,7 +283,7 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
       }
     } else {
       // Filter only users who have biometrics enabled AND are present in this device's local emails list
-      const enabledLocalUsers = usersList.filter(u => u.webAuthnEnabled && localEmails.includes(u.email.toLowerCase()));
+      const enabledLocalUsers = usersList.filter(u => u.webAuthnEnabled && localEmails.includes(u.email.trim().toLowerCase()));
 
       if (enabledLocalUsers.length === 0) {
         setErrorMsg("Please enter your email address first to proceed with Biometric Login on this device.");
@@ -490,7 +490,7 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
     const cleanEmail = email.trim().toLowerCase();
     
     // Find in the system usersList
-    const matchedUser = usersList.find(u => u.email.toLowerCase() === cleanEmail);
+    const matchedUser = usersList.find(u => u.email.trim().toLowerCase() === cleanEmail);
     if (matchedUser) {
       const expectedPassword = matchedUser.password || (matchedUser.role === 'admin' ? 'admin123' : 'user123');
       const isAdminEmail = cleanEmail === 'no-reply@fundora.one' || matchedUser.role === 'admin';
@@ -550,7 +550,7 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
     const cleanEmail = email.trim().toLowerCase();
     
     // Check if user already exists
-    const existingUser = usersList.find(u => u.email.toLowerCase() === cleanEmail);
+    const existingUser = usersList.find(u => u.email.trim().toLowerCase() === cleanEmail);
     if (existingUser) {
       if (existingUser.isEmailVerified) {
         setErrorMsg('This email address is already bound to another registered investor. Please log in.');
@@ -698,7 +698,7 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
       return;
     }
 
-    const pendingUser = usersList.find(u => u.email.toLowerCase() === (mockVerificationSentTo || email).trim().toLowerCase());
+    const pendingUser = usersList.find(u => u.email.trim().toLowerCase() === (mockVerificationSentTo || email).trim().toLowerCase());
 
     const newUser: UserAccount = {
       id: pendingUser ? pendingUser.id : `user-${Date.now()}`,
@@ -739,7 +739,7 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
     }
 
     const cleanEmail = email.trim().toLowerCase();
-    const matchedUser = usersList.find(u => u.email.toLowerCase() === cleanEmail);
+    const matchedUser = usersList.find(u => u.email.trim().toLowerCase() === cleanEmail);
 
     if (!matchedUser) {
       setErrorMsg('No registered investor found with this email address. Please register a new account.');
@@ -784,7 +784,7 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
     const cleanEmail = mockVerificationSentTo.trim().toLowerCase() || email.trim().toLowerCase();
     if (!cleanEmail) return;
 
-    const matchedUser = usersList.find(u => u.email.toLowerCase() === cleanEmail);
+    const matchedUser = usersList.find(u => u.email.trim().toLowerCase() === cleanEmail);
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     setGeneratedOtp(code);
     setIsSendingOtp(true);
@@ -977,10 +977,10 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
                 } catch (e) {}
 
                 if (typedEmail) {
-                  activeBiometricUser = usersList.find(u => u.email.toLowerCase() === typedEmail);
+                  activeBiometricUser = usersList.find(u => u.email.trim().toLowerCase() === typedEmail);
                 } else {
                   // Only consider accounts that have been registered on this specific device to prevent privacy leakage
-                  const localUsers = usersList.filter(u => u.webAuthnEnabled && localEmails.includes(u.email.toLowerCase()));
+                  const localUsers = usersList.filter(u => u.webAuthnEnabled && localEmails.includes(u.email.trim().toLowerCase()));
                   if (localUsers.length >= 1) {
                     activeBiometricUser = localUsers[0];
                   }
