@@ -19,9 +19,10 @@ interface AuthPagesProps {
   onRegisterPending?: (user: UserAccount) => void;
   onPasswordReset?: (email: string, newPassword: string) => void;
   onUpdateUser?: (userId: string, updatedFields: Partial<UserAccount>) => void;
+  isFirebaseSynced?: boolean;
 }
 
-export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNavigate, usersList, addSystemLog, authReason, onRegisterPending, onPasswordReset, onUpdateUser }: AuthPagesProps) {
+export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNavigate, usersList, addSystemLog, authReason, onRegisterPending, onPasswordReset, onUpdateUser, isFirebaseSynced = true }: AuthPagesProps) {
   const [screen, setScreen] = useState<'login' | 'register' | 'forgot' | 'verify' | 'forgot-verify'>(initialScreen);
 
   useEffect(() => {
@@ -1062,6 +1063,7 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
                   Register Account
                 </button>
               </div>
+
             </form>
           )}
 

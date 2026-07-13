@@ -1635,6 +1635,7 @@ export default function App() {
           onRegisterPending={handleRegisterPending}
           onPasswordReset={handleResetPassword}
           onUpdateUser={handleUpdateAnyUser}
+          isFirebaseSynced={isFirebaseSynced}
         />
       )}
 
