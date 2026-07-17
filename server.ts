@@ -9,7 +9,7 @@ dotenv.config();
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
   // Custom CORS middleware to support hybrid platforms (Capacitor WebView / Mobile APKs)
   app.use((req, res, next) => {
