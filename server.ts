@@ -1,7 +1,6 @@
 import express from "express";
 import path from "path";
 import dotenv from "dotenv";
-import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 
 // Load environment variables from .env
@@ -313,6 +312,73 @@ If you didn't request this verification, simply ignore this email.
     res.json({ status: "ok" });
   });
 
+  // Serve compiled Android APK at its native physical path
+  app.get("/android/app/build/outputs/apk/debug/app-debug.apk", (req, res) => {
+    const apkPath = path.join(process.cwd(), "android/app/build/outputs/apk/debug/app-debug.apk");
+    res.download(apkPath, "Fundora.apk", (err) => {
+      if (err) {
+        console.error("[APK Download] Native path download failed:", err);
+        res.status(404).send("APK file not found. Please compile the Android project first using the build script.");
+      }
+    });
+  });
+
+  // Convenient API endpoint for downloading the compiled Android APK
+  app.get("/api/download-apk", (req, res) => {
+    const apkPath = path.join(process.cwd(), "android/app/build/outputs/apk/debug/app-debug.apk");
+    res.download(apkPath, "Fundora.apk", (err) => {
+      if (err) {
+        console.error("[APK Download] API download failed:", err);
+        res.status(404).json({
+          success: false,
+          error: "APK file not found. Please compile the Android project first using the build script."
+        });
+      }
+    });
+  });
+
+  // Serve compiled Android App Bundle (AAB) at its native physical path
+  app.get("/android/app/build/outputs/bundle/debug/app-debug.aab", (req, res) => {
+    const aabPath = path.join(process.cwd(), "android/app/build/outputs/bundle/debug/app-debug.aab");
+    res.download(aabPath, "Fundora.aab", (err) => {
+      if (err) {
+        console.error("[AAB Download] Native path download failed:", err);
+        res.status(404).send("AAB file not found. Please compile the Android project first using the build script.");
+      }
+    });
+  });
+
+  // Convenient API endpoint for downloading the compiled Android AAB
+  app.get("/api/download-aab", (req, res) => {
+    const aabPath = path.join(process.cwd(), "android/app/build/outputs/bundle/debug/app-debug.aab");
+    res.download(aabPath, "Fundora.aab", (err) => {
+      if (err) {
+        console.error("[AAB Download] API download failed:", err);
+        res.status(404).json({
+          success: false,
+          error: "AAB file not found. Please compile the Android project first using the build script."
+        });
+      }
+    });
+  });
+
+  // Digital Asset Links for Trusted Web Activity (TWA) verification
+  app.get("/.well-known/assetlinks.json", (req, res) => {
+    res.setHeader("Content-Type", "application/json");
+    res.json([
+      {
+        relation: ["delegate_permission/common.handle_all_urls"],
+        target: {
+          namespace: "android_app",
+          package_name: "one.fundora.app",
+          sha256_cert_fingerprints: [
+            "69:8B:B3:13:FF:F5:F3:C5:A0:A1:18:B2:53:FD:89:9F:B3:16:E6:DC:F3:C8:24:96:93:AD:F3:74:CF:72:E3:4E"
+          ]
+        }
+      }
+    ]);
+  });
+
   // Redirect direct /join paths to client-side SPA hash routing
   app.get("/join", (req, res) => {
     const ref = req.query.ref || "";
@@ -332,6 +398,7 @@ If you didn't request this verification, simply ignore this email.
   // Integrate Vite middleware in development
   if (process.env.NODE_ENV !== "production") {
     console.log("Starting server in DEVELOPMENT mode with Vite Middleware...");
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa"

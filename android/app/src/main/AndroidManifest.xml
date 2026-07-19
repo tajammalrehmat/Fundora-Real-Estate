@@ -9,6 +9,47 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
 
+        <!-- TWA (Trusted Web Activity) Metadata Configuration -->
+        <meta-data
+            android:name="android.support.customtabs.trusted.DEFAULT_URL"
+            android:value="https://ais-pre-hb5de275kkaohqffdp2qfz-614235734610.asia-southeast1.run.app" />
+
+        <meta-data
+            android:name="android.support.customtabs.trusted.STATUS_BAR_COLOR"
+            android:value="#030514" />
+
+        <meta-data
+            android:name="android.support.customtabs.trusted.NAVIGATION_BAR_COLOR"
+            android:value="#030514" />
+
+        <meta-data
+            android:name="android.support.customtabs.trusted.SPLASH_IMAGE_FADE_OUT_DURATION"
+            android:value="1000" />
+
+        <meta-data
+            android:name="android.support.customtabs.trusted.FILE_PROVIDER_AUTHORITY"
+            android:value="one.fundora.app.fileprovider" />
+
+        <!-- TWA Launcher Activity -->
+        <activity
+            android:name="com.google.androidbrowserhelper.trusted.LauncherActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="ais-pre-hb5de275kkaohqffdp2qfz-614235734610.asia-southeast1.run.app" />
+            </intent-filter>
+        </activity>
+
+        <!-- Capacitor Bridge Activity (No longer the main launcher, but preserved) -->
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
             android:name=".MainActivity"
@@ -16,12 +57,6 @@
             android:theme="@style/AppTheme.NoActionBarLaunch"
             android:launchMode="singleTask"
             android:exported="true">
-
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-
         </activity>
 
         <provider

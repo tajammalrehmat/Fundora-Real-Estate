@@ -52,11 +52,11 @@ echo "Gradle version: $(gradle -v)"
 echo "=== Building Capacitor Web Assets ==="
 npm run android:build
 
-echo "=== Compiling Android Debug APK (Standard Memory Mode) ==="
+echo "=== Compiling Android Debug APK & AAB (Standard Memory Mode) ==="
 # Set java memory limit for other processes
 export _JAVA_OPTIONS="-Xmx2048m -XX:MaxMetaspaceSize=512m -XX:+UseSerialGC"
 
-gradle -p android assembleDebug \
+gradle -p android assembleDebug bundleDebug \
   --stacktrace \
   --no-daemon \
   --no-parallel \
@@ -66,4 +66,7 @@ gradle -p android assembleDebug \
   -Dorg.gradle.workers.max=1
 
 echo "=== Checking Build Artifacts ==="
+echo "--- APK files found ---"
 find android -name "*.apk"
+echo "--- AAB files found ---"
+find android -name "*.aab"
