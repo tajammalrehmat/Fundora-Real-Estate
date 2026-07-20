@@ -9,6 +9,14 @@ import { UserAccount } from '../types';
 import { ShieldAlert, Mail, Lock, User, Key, UserCheck, AlertTriangle, Sparkles, Shield, Loader2, Fingerprint } from 'lucide-react';
 import { sendOtpEmail, isEmailServiceConfigured } from '../lib/emailService';
 
+const isProductionOrNative = (): boolean => {
+  const isCapacitor = typeof window !== 'undefined' && (window as any).Capacitor && (
+    (window as any).Capacitor.isNative || 
+    ((window as any).Capacitor.getPlatform && (window as any).Capacitor.getPlatform() !== 'web')
+  );
+  return isCapacitor || import.meta.env.PROD;
+};
+
 interface AuthPagesProps {
   initialScreen?: 'login' | 'register' | 'forgot' | 'verify' | 'forgot-verify';
   onAuthSuccess: (user: UserAccount | { id: string; email: string; name: string; role: 'user' | 'admin'; referralCode: string; wallet: any; balance: number; totalDeposited: number; totalWithdrawn: number; totalInvestment: number; totalProfitEarned: number; isEmailVerified: boolean; registrationDate: string; referredBy?: string }) => void;
@@ -1280,7 +1288,11 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
                   </div>
                 )}
 
-                {(!isEmailServiceConfigured() || showMockFallback) && (
+                {isProductionOrNative() ? (
+                  <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-xl text-[11px] leading-relaxed text-center">
+                    <p>Check your email inbox or spam folder for your 6-digit password reset code.</p>
+                  </div>
+                ) : ((!isEmailServiceConfigured() || showMockFallback) ? (
                   <div className="p-3 bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded-xl text-[11px] leading-relaxed text-center font-sans">
                     <p className="font-extrabold uppercase tracking-wide text-[9px] text-amber-400">✨ Developer Simulation Active</p>
                     <p className="text-slate-300 text-[10px]">Use this simulated reset code to bypass:</p>
@@ -1293,7 +1305,11 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
                       [ Auto-fill Code ]
                     </button>
                   </div>
-                )}
+                ) : (
+                  <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-xl text-[11px] leading-relaxed text-center">
+                    <p>Check your email inbox or spam folder for your 6-digit password reset code.</p>
+                  </div>
+                ))}
               </div>
 
               <div className="space-y-1.5">
@@ -1395,7 +1411,11 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
                   </div>
                 )}
 
-                {isEmailServiceConfigured() && !showMockFallback ? (
+                {isProductionOrNative() ? (
+                  <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-xl text-[11px] leading-relaxed text-center">
+                    <p>Check your email inbox or spam folder for your 6-digit confirmation code.</p>
+                  </div>
+                ) : (isEmailServiceConfigured() && !showMockFallback ? (
                   <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-xl text-[11px] leading-relaxed text-center">
                     <p>Check your email inbox or spam folder for your 6-digit confirmation code.</p>
                   </div>
@@ -1414,7 +1434,7 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
                       <span>[ Auto-fill OTP ]</span>
                     </button>
                   </div>
-                )}
+                ))}
               </div>
 
               <div className="space-y-1.5">
