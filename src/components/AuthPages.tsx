@@ -812,6 +812,44 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
     }
   };
 
+  const handleResendRegistrationOtp = async () => {
+    setErrorMsg('');
+    setSuccessMsg('');
+    setEmailSendError(null);
+    setShowMockFallback(false);
+    const cleanEmail = mockVerificationSentTo.trim().toLowerCase() || email.trim().toLowerCase();
+    if (!cleanEmail) {
+      setErrorMsg('Email address not found. Please try registering again.');
+      return;
+    }
+
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    setGeneratedOtp(code);
+    setIsSendingOtp(true);
+
+    try {
+      const res = await sendOtpEmail({
+        toEmail: cleanEmail,
+        toName: fullName || 'Investor',
+        otpCode: code
+      });
+      setIsSendingOtp(false);
+
+      if (res.success) {
+        setSuccessMsg(`A new registration verification code has been dispatched to ${cleanEmail}.`);
+      } else {
+        console.warn("Real-time email sending fallback triggered:", res.error);
+        setEmailSendError(res.error || "Failed to deliver OTP via real email.");
+        setShowMockFallback(true);
+      }
+      addSystemLog('Register_Referral', `Registration OTP resent for ${cleanEmail}. New OTP ${code} dispatched.`, 'Secure');
+    } catch (err: any) {
+      setIsSendingOtp(false);
+      setEmailSendError(err.message || "Failed to contact proxy email service.");
+      setShowMockFallback(true);
+    }
+  };
+
   const handleVerifyResetPassword = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
@@ -1398,6 +1436,30 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
               >
                 Complete Verification & Register
               </button>
+
+              <div className="flex justify-between items-center text-xs pt-1">
+                <button 
+                  type="button"
+                  disabled={isSendingOtp}
+                  onClick={handleResendRegistrationOtp}
+                  className="text-slate-400 hover:text-white hover:underline font-bold disabled:opacity-50 cursor-pointer"
+                >
+                  {isSendingOtp ? 'Resending...' : 'Resend Code'}
+                </button>
+
+                <button 
+                  type="button"
+                  onClick={() => {
+                    setErrorMsg('');
+                    setSuccessMsg('');
+                    setScreen('login');
+                    onNavigate('login');
+                  }}
+                  className="text-amber-400 hover:underline font-bold cursor-pointer"
+                >
+                  Back to Login
+                </button>
+              </div>
             </form>
           )}
 
