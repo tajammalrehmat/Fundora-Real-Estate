@@ -66,7 +66,7 @@ export default function AdminPanel({
     scanGateSubtitle: 'Dispatch on the matching blockchain. Tokens sent to mismatched networks are irreversibly lost.',
     usdtTrc20QrCode: '',
     usdtBep20QrCode: '',
-    apiUrl: 'https://ais-pre-hb5de275kkaohqffdp2qfz-614235734610.asia-southeast1.run.app'
+    apiUrl: 'https://fundora.one'
   },
   onUpdateSystemSettings,
   onUpdateUser,
@@ -180,7 +180,7 @@ export default function AdminPanel({
       const defaultBep20 = '0x71C7656EC7ab88b098defB751B7401B5f6d8976F';
       const defaultTitle = 'Barcode Scanning Gateway';
       const defaultSubtitle = 'Dispatch on the matching blockchain. Tokens sent to mismatched networks are irreversibly lost.';
-      const defaultApiUrl = 'https://ais-pre-hb5de275kkaohqffdp2qfz-614235734610.asia-southeast1.run.app';
+      const defaultApiUrl = 'https://fundora.one';
 
       setTrc20Addr(defaultTrc20);
       setBep20Addr(defaultBep20);
@@ -2303,7 +2303,7 @@ export default function AdminPanel({
                     required
                     value={apiUrl}
                     onChange={(e) => setApiUrl(e.target.value)}
-                    placeholder="https://ais-pre-hb5de275kkaohqffdp2qfz-614235734610.asia-southeast1.run.app"
+                    placeholder="https://fundora.one"
                     className="w-full bg-slate-950 border border-slate-850 rounded-xl px-4 py-2.5 text-slate-100 font-mono text-xs focus:outline-none focus:border-amber-500 focus:bg-slate-950"
                   />
                   <span className="text-[8px] text-slate-500 block">The base URL where this app's Express/Vercel endpoints (like <code>/api/analyze-receipt</code> and <code>/api/send-otp</code>) are hosted. Required for receipt auto-fetching and OTP delivery to work within compiled APKs.</span>

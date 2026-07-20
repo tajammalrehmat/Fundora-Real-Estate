@@ -314,7 +314,7 @@ export default function App() {
       try {
         const parsed = JSON.parse(saved);
         if (!parsed.apiUrl || parsed.apiUrl.trim().length < 10) {
-          parsed.apiUrl = 'https://ais-pre-hb5de275kkaohqffdp2qfz-614235734610.asia-southeast1.run.app';
+          parsed.apiUrl = 'https://fundora.one';
         }
         return parsed;
       } catch (_) {}
@@ -325,7 +325,7 @@ export default function App() {
       usdtBep20Address: '0x71C7656EC7ab88b098defB751B7401B5f6d8976F',
       scanGateTitle: 'Barcode Scanning Gateway',
       scanGateSubtitle: 'Dispatch on the matching blockchain. Tokens sent to mismatched networks are irreversibly lost.',
-      apiUrl: 'https://ais-pre-hb5de275kkaohqffdp2qfz-614235734610.asia-southeast1.run.app'
+      apiUrl: 'https://fundora.one'
     };
   });
 

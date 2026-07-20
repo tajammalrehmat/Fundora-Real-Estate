@@ -27,7 +27,7 @@ export const getApiUrl = (path: string): string => {
 
   // Define fallback URLs for Dev and Pre/Prod
   const devUrl = 'https://ais-dev-hb5de275kkaohqffdp2qfz-614235734610.asia-southeast1.run.app';
-  const preUrl = 'https://ais-pre-hb5de275kkaohqffdp2qfz-614235734610.asia-southeast1.run.app';
+  const preUrl = 'https://fundora.one';
   const isDev = import.meta.env.DEV || import.meta.env.MODE === 'development';
   const defaultBaseUrl = isDev ? devUrl : preUrl;
 
@@ -113,10 +113,10 @@ export const fetchWithFallback = async (path: string, options: RequestInit = {})
     }
 
     const devUrl = 'https://ais-dev-hb5de275kkaohqffdp2qfz-614235734610.asia-southeast1.run.app';
-    const preUrl = 'https://ais-pre-hb5de275kkaohqffdp2qfz-614235734610.asia-southeast1.run.app';
+    const preUrl = 'https://fundora.one';
 
     let fallbackUrl = '';
-    if (primaryUrl.includes('ais-pre-')) {
+    if (primaryUrl.includes('fundora.one') || primaryUrl.includes('ais-pre-')) {
       fallbackUrl = `${devUrl}${formattedPath}`;
     } else if (primaryUrl.includes('ais-dev-')) {
       fallbackUrl = `${preUrl}${formattedPath}`;

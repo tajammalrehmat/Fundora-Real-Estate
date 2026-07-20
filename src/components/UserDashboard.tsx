@@ -104,7 +104,7 @@ export default function UserDashboard({
     scanGateSubtitle: 'Dispatch on the matching blockchain. Tokens sent to mismatched networks are irreversibly lost.',
     usdtTrc20QrCode: '',
     usdtBep20QrCode: '',
-    apiUrl: 'https://ais-pre-hb5de275kkaohqffdp2qfz-614235734610.asia-southeast1.run.app'
+    apiUrl: 'https://fundora.one'
   }
 }: UserDashboardProps) {
   // Current Tab state

@@ -13,7 +13,7 @@
         <!-- TWA (Trusted Web Activity) Metadata Configuration -->
         <meta-data
             android:name="android.support.customtabs.trusted.DEFAULT_URL"
-            android:value="https://ais-pre-hb5de275kkaohqffdp2qfz-614235734610.asia-southeast1.run.app" />
+            android:value="https://fundora.one" />
 
         <meta-data
             android:name="android.support.customtabs.trusted.STATUS_BAR_COLOR"
@@ -47,7 +47,7 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data
                     android:scheme="https"
-                    android:host="ais-pre-hb5de275kkaohqffdp2qfz-614235734610.asia-southeast1.run.app" />
+                    android:host="fundora.one" />
             </intent-filter>
         </activity>
         -->
@@ -71,7 +71,7 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data
                     android:scheme="https"
-                    android:host="ais-pre-hb5de275kkaohqffdp2qfz-614235734610.asia-southeast1.run.app" />
+                    android:host="fundora.one" />
             </intent-filter>
         </activity>
 

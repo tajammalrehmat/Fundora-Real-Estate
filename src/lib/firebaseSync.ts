@@ -305,7 +305,7 @@ export const loadSystemSettingsFromFirebase = async (): Promise<SystemSettings |
     usdtBep20Address: '0x71C7656EC7ab88b098defB751B7401B5f6d8976F',
     scanGateTitle: 'Barcode Scanning Gateway',
     scanGateSubtitle: 'Dispatch on the matching blockchain. Tokens sent to mismatched networks are irreversibly lost.',
-    apiUrl: 'https://ais-pre-hb5de275kkaohqffdp2qfz-614235734610.asia-southeast1.run.app'
+    apiUrl: 'https://fundora.one'
   };
 
   if (!isFirebaseEnabled()) return null;
