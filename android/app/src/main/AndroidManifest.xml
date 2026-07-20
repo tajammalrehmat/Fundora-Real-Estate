@@ -30,7 +30,8 @@
             android:name="android.support.customtabs.trusted.FILE_PROVIDER_AUTHORITY"
             android:value="one.fundora.app.fileprovider" />
 
-        <!-- TWA Launcher Activity -->
+        <!-- TWA Launcher Activity (Disabled to favor real Capacitor MainActivity launcher with native Biometric & OTP support) -->
+        <!--
         <activity
             android:name="com.google.androidbrowserhelper.trusted.LauncherActivity"
             android:exported="true">
@@ -48,8 +49,9 @@
                     android:host="ais-pre-hb5de275kkaohqffdp2qfz-614235734610.asia-southeast1.run.app" />
             </intent-filter>
         </activity>
+        -->
 
-        <!-- Capacitor Bridge Activity (No longer the main launcher, but preserved) -->
+        <!-- Capacitor Bridge Activity (Primary launcher for the fully native Fundora Android experience) -->
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
             android:name=".MainActivity"
@@ -57,6 +59,19 @@
             android:theme="@style/AppTheme.NoActionBarLaunch"
             android:launchMode="singleTask"
             android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="ais-pre-hb5de275kkaohqffdp2qfz-614235734610.asia-southeast1.run.app" />
+            </intent-filter>
         </activity>
 
         <provider
@@ -73,4 +88,6 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+    <uses-permission android:name="android.permission.USE_FINGERPRINT" />
 </manifest>

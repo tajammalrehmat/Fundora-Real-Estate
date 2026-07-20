@@ -2427,6 +2427,8 @@ export default function AdminPanel({
           </div>
         )}
 
+
+
         {/* ==================== TAB 8: REAL-TIME INQUIRIES DESK ==================== */}
         {adminTab === 'inquiries' && (
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
