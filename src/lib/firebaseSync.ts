@@ -159,12 +159,12 @@ export const loadUsersFromFirebase = async (): Promise<UserAccount[] | null> => 
     if (snapshot.empty) return [INITIAL_USER, INITIAL_ADMIN];
     const users = snapshot.docs.map(d => d.data() as UserAccount);
     
-    // Automatically migrate old admin email to no-reply@fundora.one if found
+    // Automatically migrate old admin email to fundora.one@gmail.com if found
     let migrated = false;
     const migratedUsers = users.map(u => {
-      if (u.id === 'user-admin' && u.email === 'admin@fundora.one') {
+      if (u.id === 'user-admin' && (u.email === 'admin@fundora.one' || u.email === 'no-reply@fundora.one')) {
         migrated = true;
-        return { ...u, email: 'no-reply@fundora.one' };
+        return { ...u, email: 'fundora.one@gmail.com' };
       }
       return u;
     });

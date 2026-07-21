@@ -83,7 +83,7 @@ export default function App() {
   const [usersListState, setUsersListState] = useState<UserAccount[]>(() => {
     const saved = localStorage.getItem('inv_users');
     const list: UserAccount[] = saved ? JSON.parse(saved) : [INITIAL_USER, INITIAL_ADMIN];
-    return list.map(u => u.id === 'user-admin' && u.email === 'admin@fundora.one' ? { ...u, email: 'no-reply@fundora.one' } : u);
+    return list.map(u => u.id === 'user-admin' && (u.email === 'admin@fundora.one' || u.email === 'no-reply@fundora.one') ? { ...u, email: 'fundora.one@gmail.com' } : u);
   });
 
   const [activeUser, setActiveUser] = useState<UserAccount | null>(() => {
@@ -91,8 +91,8 @@ export default function App() {
     if (!saved) return null;
     try {
       const parsed = JSON.parse(saved);
-      if (parsed && parsed.id === 'user-admin' && parsed.email === 'admin@fundora.one') {
-        return { ...parsed, email: 'no-reply@fundora.one' };
+      if (parsed && parsed.id === 'user-admin' && (parsed.email === 'admin@fundora.one' || parsed.email === 'no-reply@fundora.one')) {
+        return { ...parsed, email: 'fundora.one@gmail.com' };
       }
       return parsed;
     } catch (_) {

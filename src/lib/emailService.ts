@@ -24,23 +24,33 @@ const EMAILJS_PUBLIC_KEY = (import.meta.env.VITE_EMAILJS_PUBLIC_KEY || '').trim(
 
 // Resend API (Completely free, branding-free, custom-domain transactional mail)
 const RESEND_API_KEY = (import.meta.env.VITE_RESEND_API_KEY || '').trim();
-const RESEND_FROM_EMAIL = (import.meta.env.VITE_RESEND_FROM_EMAIL || 'no-reply@fundora.one').trim();
+const RESEND_FROM_EMAIL = (import.meta.env.VITE_RESEND_FROM_EMAIL || 'fundora.one@gmail.com').trim();
 const EMAIL_SERVICE_ACTIVE = (import.meta.env.VITE_EMAIL_SERVICE_ACTIVE || '').trim().toLowerCase() === 'true';
 
+// Secure Custom Proxy (perfect for GitHub Pages to hide credentials from client code)
+const VITE_SECURE_PROXY_URL = (import.meta.env.VITE_SECURE_PROXY_URL || '').trim();
+
 /**
- * Checks if any email service (EmailJS or Resend) is properly configured
+ * Checks if any email service (EmailJS, Resend, or Secure Proxy) is properly configured
  */
 export const isEmailServiceConfigured = (): boolean => {
-  // We default to true because we always attempt secure server-side delivery via the Resend API proxy.
-  return true;
+  return !!(EMAILJS_SERVICE_ID || RESEND_API_KEY || VITE_SECURE_PROXY_URL);
 };
 
 /**
  * Returns which service is currently active
  */
-export const getActiveEmailService = (): 'resend' | 'emailjs' | 'none' => {
-  // Default to server-side resend integration
-  return 'resend';
+export const getActiveEmailService = (): 'resend' | 'emailjs' | 'proxy' | 'none' => {
+  if (VITE_SECURE_PROXY_URL) {
+    return 'proxy';
+  }
+  if (EMAILJS_SERVICE_ID && EMAILJS_TEMPLATE_ID && EMAILJS_PUBLIC_KEY) {
+    return 'emailjs';
+  }
+  if (RESEND_API_KEY) {
+    return 'resend';
+  }
+  return 'none';
 };
 
 /**
@@ -49,6 +59,42 @@ export const getActiveEmailService = (): 'resend' | 'emailjs' | 'none' => {
  */
 export const sendOtpEmail = async (params: EmailParams): Promise<{ success: boolean; error?: string }> => {
   const { toEmail, toName, otpCode } = params;
+
+  // If a secure proxy URL is configured, use it directly! Perfect for static environments like GitHub Pages.
+  if (VITE_SECURE_PROXY_URL) {
+    console.log(`[Email Service] Secure Proxy URL configured. Dispatching OTP to: ${VITE_SECURE_PROXY_URL}`);
+    try {
+      const response = await fetch(VITE_SECURE_PROXY_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          toEmail,
+          toName,
+          otpCode,
+        }),
+      });
+
+      if (response.ok) {
+        console.log(`Successfully sent unbranded premium OTP to ${toEmail} via Secure Proxy Webhook`);
+        return { success: true };
+      } else {
+        const errorText = await response.text();
+        console.warn(`Secure Proxy Webhook returned error (${response.status}): ${errorText}`);
+        return {
+          success: false,
+          error: `Secure Proxy Server error (${response.status}): ${errorText}`
+        };
+      }
+    } catch (err: any) {
+      console.error('[Email Service] Secure Proxy exception:', err);
+      return {
+        success: false,
+        error: `Secure Proxy unreachable: ${err.message || 'Unknown network error'}`
+      };
+    }
+  }
 
   console.log(`[Email Service] Attempting to deliver premium OTP to ${toEmail} via Server API Proxy...`);
 
@@ -205,7 +251,7 @@ Fundora
             time: '10 minutes',
             till: '10 minutes',
             minutes: '10',
-            reply_to: 'no-reply@fundora.one',
+            reply_to: 'fundora.one@gmail.com',
             subject: 'Your Fundora.one Verification Code'
           },
         }),
@@ -223,6 +269,6 @@ Fundora
   // If we reach here, all email channels failed. Return clear info.
   return {
     success: false,
-    error: 'Email Delivery Failed: All delivery channels failed. Please ensure your Resend API Key is correctly set as VITE_RESEND_API_KEY in your GitHub Repository Secrets (for GitHub Pages), or RESEND_API_KEY in your Vercel Environment Variables. Also, confirm that your sending domain (e.g., fundora.one) is fully verified and active inside your Resend dashboard, and that your Resend account has not reached its sending limits.'
+    error: 'Email Delivery Failed: Direct client-side Resend is disabled on public static hosting (GitHub Pages) to prevent your API key from being exposed and revoked by GitHub. To send unbranded real-time emails securely on GitHub Pages, configure a free Google Apps Script/Cloudflare Worker proxy and set its URL as VITE_SECURE_PROXY_URL in your GitHub Repository Secrets. Alternatively, you can use EmailJS.'
   };
 };

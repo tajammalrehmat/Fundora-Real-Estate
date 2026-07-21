@@ -27,12 +27,15 @@ jobs:
 
       - name: Build App
         env:
-          VITE_RESEND_API_KEY: ${{ secrets.VITE_RESEND_API_KEY || secrets.RESEND_API_KEY || vars.VITE_RESEND_API_KEY || vars.RESEND_API_KEY }}
+          # Note: We do not pass VITE_RESEND_API_KEY here anymore.
+          # GitHub Pages is a static public host, so baking any private Resend API Key into the client-side JavaScript 
+          # would expose it publicly and trigger automatic key revocation by Resend/GitHub secret scanners.
+          # If you want real email delivery on GitHub Pages, use EmailJS (which uses public keys safe for browsers).
           VITE_EMAIL_SERVICE_ACTIVE: "true"
-          VITE_RESEND_FROM_EMAIL: ${{ secrets.VITE_RESEND_FROM_EMAIL || secrets.RESEND_FROM_EMAIL || vars.VITE_RESEND_FROM_EMAIL || vars.RESEND_FROM_EMAIL || 'no-reply@fundora.one' }}
           VITE_EMAILJS_SERVICE_ID: ${{ secrets.VITE_EMAILJS_SERVICE_ID || secrets.EMAILJS_SERVICE_ID || vars.VITE_EMAILJS_SERVICE_ID || vars.EMAILJS_SERVICE_ID }}
           VITE_EMAILJS_TEMPLATE_ID: ${{ secrets.VITE_EMAILJS_TEMPLATE_ID || secrets.EMAILJS_TEMPLATE_ID || vars.VITE_EMAILJS_TEMPLATE_ID || vars.EMAILJS_TEMPLATE_ID }}
           VITE_EMAILJS_PUBLIC_KEY: ${{ secrets.VITE_EMAILJS_PUBLIC_KEY || secrets.EMAILJS_PUBLIC_KEY || vars.VITE_EMAILJS_PUBLIC_KEY || vars.EMAILJS_PUBLIC_KEY }}
+          VITE_SECURE_PROXY_URL: ${{ secrets.VITE_SECURE_PROXY_URL || secrets.SECURE_PROXY_URL || vars.VITE_SECURE_PROXY_URL || vars.SECURE_PROXY_URL }}
         run: npm run build
 
       - name: Deploy to GitHub Pages
