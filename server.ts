@@ -44,19 +44,14 @@ async function startServer() {
       });
     }
 
-    let resendApiKey = (process.env.RESEND_API_KEY || process.env.VITE_RESEND_API_KEY || "").trim();
+    const resendApiKey = (process.env.RESEND_API_KEY || process.env.VITE_RESEND_API_KEY || "").trim();
     const resendFromEmail = (process.env.RESEND_FROM_EMAIL || process.env.VITE_RESEND_FROM_EMAIL || "no-reply@fundora.one").trim();
-
-    if (!resendApiKey) {
-      // Inject verified active Resend API keys as secure fallbacks for direct Vercel and APK builds
-      resendApiKey = "re_BwWVUELQ_BrhUFz7cEez6CJYC9RnBKMfx";
-    }
 
     if (!resendApiKey) {
       console.error("Resend API key is not configured in .env on the server.");
       return res.status(500).json({
         success: false,
-        error: "Resend API Key is not configured on the server. Please check your environment setup."
+        error: "Resend API Key is not configured on the server. Please add your RESEND_API_KEY in the environment variables settings."
       });
     }
 
