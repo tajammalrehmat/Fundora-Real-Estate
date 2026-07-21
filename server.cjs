@@ -236,31 +236,61 @@ If you didn't request this verification, simply ignore this email.
       const promptPart = {
         text: "You are an expert AI payment auditor. Carefully analyze this receipt, invoice, or screenshot of a cryptocurrency transaction (USDT) from ANY crypto wallet or exchange (such as Binance, OKX, Bybit, Trust Wallet, MetaMask, KuCoin, HTX, Bitget, Coinbase, Gate.io, etc.).\n\nIdentify and extract the following fields precisely:\n1. 'txid': The transaction hash, transaction ID, or reference code (usually a long alphanumeric/hexadecimal string like 'TX...' or '0x...'). Search for terms like TxID, TxHash, Hash, Transaction ID, Transaction Hash, Txn Hash, Ref No, Reference Number, ID, Order ID, internal ID, system reference. Do NOT include labels or words like 'TxID' or 'Transaction ID' inside the string, just the clean raw hash itself. If you cannot find a transaction hash/ID in the screenshot, search for any long alphanumeric string that resembles a transaction code/reference ID.\n2. 'amount': The exact transfer or deposit amount of USDT parsed as a number. Look for terms like Amount, Net Amount, Transferred, Sent, Quantity, Total, Value, Sum, Withdrawal Amount, Volume, Payment. Look for numbers directly followed by or near 'USDT', 'USD', 'Tether', or '$'. Only return the pure number (e.g. if the screenshot shows '150 USDT' or '$150.00', extract 150). Ignore any commas or currency labels.\n3. 'network': The matching blockchain transfer network. Look for signs of 'TRC20', 'TRX', 'Tron', 'BEP20', 'BSC', 'BNB Smart Chain', 'BSC (BEP20)'. Return either 'TRC20' or 'BEP20'. If not clearly mentioned, default to 'TRC20' if the transaction ID or destination address starts with 'T', or 'BEP20' if it starts with '0x'. If no network is found, default to 'TRC20'.\n\nFormat the output STRICTLY as JSON matching the schema. Do not fail under any circumstances. If some fields are missing, extract the most plausible candidates."
       };
-      const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
-        contents: { parts: [imagePart, promptPart] },
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: import_genai.Type.OBJECT,
-            properties: {
-              txid: {
-                type: import_genai.Type.STRING,
-                description: "The transaction hash, ID or TxID from the screenshot."
+      let response;
+      try {
+        response = await ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: { parts: [imagePart, promptPart] },
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: import_genai.Type.OBJECT,
+              properties: {
+                txid: {
+                  type: import_genai.Type.STRING,
+                  description: "The transaction hash, ID or TxID from the screenshot."
+                },
+                amount: {
+                  type: import_genai.Type.NUMBER,
+                  description: "The transfer amount parsed as a number."
+                },
+                network: {
+                  type: import_genai.Type.STRING,
+                  description: "The blockchain network ('TRC20' or 'BEP20')."
+                }
               },
-              amount: {
-                type: import_genai.Type.NUMBER,
-                description: "The transfer amount parsed as a number."
-              },
-              network: {
-                type: import_genai.Type.STRING,
-                description: "The blockchain network ('TRC20' or 'BEP20')."
-              }
-            },
-            required: ["txid", "amount", "network"]
+              required: ["txid", "amount", "network"]
+            }
           }
-        }
-      });
+        });
+      } catch (primaryErr) {
+        console.warn("[Receipt Analyzer] gemini-2.5-flash call failed, trying gemini-1.5-flash fallback:", primaryErr?.message || primaryErr);
+        response = await ai.models.generateContent({
+          model: "gemini-1.5-flash",
+          contents: { parts: [imagePart, promptPart] },
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: import_genai.Type.OBJECT,
+              properties: {
+                txid: {
+                  type: import_genai.Type.STRING,
+                  description: "The transaction hash, ID or TxID from the screenshot."
+                },
+                amount: {
+                  type: import_genai.Type.NUMBER,
+                  description: "The transfer amount parsed as a number."
+                },
+                network: {
+                  type: import_genai.Type.STRING,
+                  description: "The blockchain network ('TRC20' or 'BEP20')."
+                }
+              },
+              required: ["txid", "amount", "network"]
+            }
+          }
+        });
+      }
       const responseText = response.text || "{}";
       console.log(`[Receipt Analyzer] Gemini Raw Response:`, responseText);
       let cleanedResponse = responseText.trim();
