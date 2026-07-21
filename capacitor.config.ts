@@ -5,6 +5,8 @@ const config: CapacitorConfig = {
   appName: 'Fundora',
   webDir: 'dist',
   server: {
+    url: 'https://fundora.one',
+    allowNavigation: ['fundora.one', '*.fundora.one'],
     androidScheme: 'https',
     cleartext: true
   },

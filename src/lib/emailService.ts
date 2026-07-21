@@ -80,6 +80,15 @@ export const sendOtpEmail = async (params: EmailParams): Promise<{ success: bool
       }
       console.warn(`Resend API Proxy returned error (${response.status}): ${errorDetail}. Trying direct client/EmailJS fallback if available...`);
       
+      // If no local client-side fallbacks are configured, return the actual server error directly
+      const hasClientFallback = !!(RESEND_API_KEY || (EMAILJS_SERVICE_ID && EMAILJS_TEMPLATE_ID && EMAILJS_PUBLIC_KEY));
+      if (!hasClientFallback) {
+        return {
+          success: false,
+          error: `Server Error (${response.status}): ${errorDetail}`
+        };
+      }
+      
       // If server explicitly said API key is missing, propagate that clearly so the developer knows
       if (errorDetail.includes('API Key is not configured on the server')) {
         return {

@@ -172,6 +172,18 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
         setShowBiometricLoginModal(false);
       }, 1200);
     } else {
+      localStorage.setItem(`inv_device_biometric_active_${cleanEmail}`, 'true');
+      try {
+        const existing = localStorage.getItem('inv_local_biometric_emails');
+        const emails = existing ? JSON.parse(existing) : [];
+        if (!emails.includes(cleanEmail)) {
+          emails.push(cleanEmail);
+          localStorage.setItem('inv_local_biometric_emails', JSON.stringify(emails));
+        }
+      } catch (e) {
+        localStorage.setItem('inv_local_biometric_emails', JSON.stringify([cleanEmail]));
+      }
+
       addSystemLog('Login_Success', `Biometric authentication approved for ${matched.email}`, 'Secure');
       setTimeout(() => {
         setShowBiometricLoginModal(false);
@@ -287,7 +299,19 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
         return;
       }
       const isLocal = localEmails.includes(targetEmail);
-      const isAllowed = actionType === 'enable' ? userToAuth.webAuthnEnabled : (userToAuth.webAuthnEnabled && isLocal);
+      
+      // Determine if running inside native Capacitor app
+      const isCapacitorApp = typeof window !== 'undefined' && (window as any).Capacitor && (
+        (window as any).Capacitor.isNative || 
+        ((window as any).Capacitor.getPlatform && (window as any).Capacitor.getPlatform() !== 'web')
+      );
+
+      // In Capacitor native app, allow biometric login if the remote account has it enabled,
+      // even if the local storage registry was cleared (e.g., during reinstall).
+      const isAllowed = actionType === 'enable' 
+        ? userToAuth.webAuthnEnabled 
+        : (userToAuth.webAuthnEnabled && (isLocal || isCapacitorApp));
+
       if (!isAllowed) {
         setErrorMsg("Biometric login has not been configured on this device for this account. Please log in with your password and enable it in Profile Settings.");
         return;

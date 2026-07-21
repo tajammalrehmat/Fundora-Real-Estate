@@ -44,9 +44,11 @@ try {
   app = initializeApp(firebaseConfig);
   try {
     db = initializeFirestore(app, {
-      experimentalForceLongPolling: true
-    }, "ai-studio-investyarealesta-ac1ea9f8-3719-4f80-acc1-938a72544e51");
-    console.log("Firestore successfully initialized with experimentalForceLongPolling enabled for APK compatibility.");
+      experimentalForceLongPolling: true,
+      experimentalAutoDetectLongPolling: true,
+      useFetchStreams: false
+    } as any, "ai-studio-investyarealesta-ac1ea9f8-3719-4f80-acc1-938a72544e51");
+    console.log("Firestore successfully initialized with experimentalForceLongPolling, experimentalAutoDetectLongPolling, and useFetchStreams disabled for connection resilience.");
   } catch (err) {
     console.warn("initializeFirestore with long polling failed, falling back to standard getFirestore:", err);
     db = getFirestore(app, "ai-studio-investyarealesta-ac1ea9f8-3719-4f80-acc1-938a72544e51");
