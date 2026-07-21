@@ -217,9 +217,9 @@ Fundora
     }
   }
 
-  // If we reach here, all email channels failed. Return clear info for simulation.
+  // If we reach here, all email channels failed. Return clear info.
   return {
     success: false,
-    error: 'Resend API Key is not configured on the server. Please check your environment setup.'
+    error: 'All email delivery channels failed (unreachable proxy server or missing API configuration). Please ensure your device is online, and your Vercel RESEND_API_KEY environment variable is correctly configured.'
   };
 };
