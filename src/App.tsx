@@ -501,19 +501,26 @@ export default function App() {
       // Seed first if empty
       await seedInitialDataIfEmpty();
 
-      // Load all collections
-      try {
-        const [projects, users, transactions, investments, claims, logs, settings, inquiries] = await Promise.all([
-          loadProjectsFromFirebase(),
-          loadUsersFromFirebase(),
-          loadTransactionsFromFirebase(),
-          loadInvestmentsFromFirebase(),
-          loadClaimsFromFirebase(),
-          loadSecurityLogsFromFirebase(),
-          loadSystemSettingsFromFirebase(),
-          loadInquiriesFromFirebase()
-        ]);
+      // Load all collections safely and individually
+      let projects = null;
+      let users = null;
+      let transactions = null;
+      let investments = null;
+      let claims = null;
+      let logs = null;
+      let settings = null;
+      let inquiries = null;
 
+      try { projects = await loadProjectsFromFirebase(); } catch (e) { console.error("Error loading projects collection:", e); }
+      try { users = await loadUsersFromFirebase(); } catch (e) { console.error("Error loading users collection:", e); }
+      try { transactions = await loadTransactionsFromFirebase(); } catch (e) { console.error("Error loading transactions collection:", e); }
+      try { investments = await loadInvestmentsFromFirebase(); } catch (e) { console.error("Error loading investments collection:", e); }
+      try { claims = await loadClaimsFromFirebase(); } catch (e) { console.error("Error loading claims collection:", e); }
+      try { logs = await loadSecurityLogsFromFirebase(); } catch (e) { console.error("Error loading security logs collection:", e); }
+      try { settings = await loadSystemSettingsFromFirebase(); } catch (e) { console.error("Error loading system settings collection:", e); }
+      try { inquiries = await loadInquiriesFromFirebase(); } catch (e) { console.error("Error loading inquiries collection:", e); }
+
+      try {
         if (projects !== null) {
           let filteredProjects = projects || [];
           const originalDeletedIds = ['proj-1', 'proj-2', 'proj-4', 'proj-5', 'proj-7'];

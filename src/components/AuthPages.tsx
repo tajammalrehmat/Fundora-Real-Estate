@@ -8,6 +8,9 @@ import { NativeBiometric } from 'capacitor-native-biometric';
 import { UserAccount } from '../types';
 import { ShieldAlert, Mail, Lock, User, Key, UserCheck, AlertTriangle, Sparkles, Shield, Loader2, Fingerprint } from 'lucide-react';
 import { sendOtpEmail, isEmailServiceConfigured } from '../lib/emailService';
+import { db } from '../lib/firebase';
+import { isFirebaseEnabled } from '../lib/firebaseSync';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 
 const isProductionOrNative = (): boolean => {
   const isCapacitor = typeof window !== 'undefined' && (window as any).Capacitor && (
@@ -484,7 +487,7 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
   };
 
   // Handle Login
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
     setSuccessMsg('');
@@ -498,7 +501,28 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
     const cleanEmail = email.trim().toLowerCase();
     
     // Find in the system usersList
-    const matchedUser = usersList.find(u => u.email.trim().toLowerCase() === cleanEmail);
+    let matchedUser = usersList.find(u => u.email.trim().toLowerCase() === cleanEmail);
+
+    // If not found in local usersList state, query Firestore database live as a safeguard
+    if (!matchedUser && isFirebaseEnabled()) {
+      try {
+        console.log(`[Login] User not found in local state. Querying Firestore live for ${cleanEmail}...`);
+        const q = query(collection(db, 'users'), where('email', '==', cleanEmail));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          const fbUser = snap.docs[0].data() as UserAccount;
+          console.log("[Login] Found user in Firestore live query:", fbUser);
+          matchedUser = fbUser;
+          // Optionally register / update user in the parent component's state
+          if (onUpdateUser) {
+            onUpdateUser(fbUser.id, fbUser);
+          }
+        }
+      } catch (err: any) {
+        console.warn("[Login] Firestore live query error:", err);
+      }
+    }
+
     if (matchedUser) {
       const expectedPassword = matchedUser.password || (matchedUser.role === 'admin' ? 'admin123' : 'user123');
       const isAdminEmail = cleanEmail === 'no-reply@fundora.one' || matchedUser.role === 'admin';

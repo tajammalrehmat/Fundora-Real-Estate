@@ -5,6 +5,7 @@
 
 import { initializeApp } from 'firebase/app';
 import { 
+  initializeFirestore,
   getFirestore, 
   collection, 
   doc, 
@@ -41,7 +42,15 @@ let auth: any;
 
 try {
   app = initializeApp(firebaseConfig);
-  db = getFirestore(app, "ai-studio-investyarealesta-ac1ea9f8-3719-4f80-acc1-938a72544e51");
+  try {
+    db = initializeFirestore(app, {
+      experimentalForceLongPolling: true
+    }, "ai-studio-investyarealesta-ac1ea9f8-3719-4f80-acc1-938a72544e51");
+    console.log("Firestore successfully initialized with experimentalForceLongPolling enabled for APK compatibility.");
+  } catch (err) {
+    console.warn("initializeFirestore with long polling failed, falling back to standard getFirestore:", err);
+    db = getFirestore(app, "ai-studio-investyarealesta-ac1ea9f8-3719-4f80-acc1-938a72544e51");
+  }
   auth = getAuth(app);
 } catch (error) {
   console.error("Firebase failed to initialize:", error);
