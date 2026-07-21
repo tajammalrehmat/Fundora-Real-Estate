@@ -17,7 +17,8 @@ const isProductionOrNative = (): boolean => {
     (window as any).Capacitor.isNative || 
     ((window as any).Capacitor.getPlatform && (window as any).Capacitor.getPlatform() !== 'web')
   );
-  return isCapacitor || import.meta.env.PROD;
+  const isFundoraDomain = typeof window !== 'undefined' && window.location.hostname.includes('fundora.one');
+  return isCapacitor || import.meta.env.PROD || isFundoraDomain || isEmailServiceConfigured();
 };
 
 interface AuthPagesProps {

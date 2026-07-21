@@ -251,31 +251,61 @@ If you didn't request this verification, simply ignore this email.
               "Format the output STRICTLY as JSON matching the schema. Do not fail under any circumstances. If some fields are missing, extract the most plausible candidates.",
       };
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
-        contents: { parts: [imagePart, promptPart] },
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              txid: {
-                type: Type.STRING,
-                description: "The transaction hash, ID or TxID from the screenshot.",
+      let response;
+      try {
+        response = await ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: { parts: [imagePart, promptPart] },
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                txid: {
+                  type: Type.STRING,
+                  description: "The transaction hash, ID or TxID from the screenshot.",
+                },
+                amount: {
+                  type: Type.NUMBER,
+                  description: "The transfer amount parsed as a number.",
+                },
+                network: {
+                  type: Type.STRING,
+                  description: "The blockchain network ('TRC20' or 'BEP20').",
+                }
               },
-              amount: {
-                type: Type.NUMBER,
-                description: "The transfer amount parsed as a number.",
-              },
-              network: {
-                type: Type.STRING,
-                description: "The blockchain network ('TRC20' or 'BEP20').",
-              }
-            },
-            required: ["txid", "amount", "network"],
+              required: ["txid", "amount", "network"],
+            }
           }
-        }
-      });
+        });
+      } catch (primaryErr: any) {
+        console.warn("[Receipt Analyzer] gemini-2.5-flash call failed, trying gemini-1.5-flash fallback:", primaryErr?.message || primaryErr);
+        response = await ai.models.generateContent({
+          model: "gemini-1.5-flash",
+          contents: { parts: [imagePart, promptPart] },
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                txid: {
+                  type: Type.STRING,
+                  description: "The transaction hash, ID or TxID from the screenshot.",
+                },
+                amount: {
+                  type: Type.NUMBER,
+                  description: "The transfer amount parsed as a number.",
+                },
+                network: {
+                  type: Type.STRING,
+                  description: "The blockchain network ('TRC20' or 'BEP20').",
+                }
+              },
+              required: ["txid", "amount", "network"],
+            }
+          }
+        });
+      }
 
       const responseText = response.text || "{}";
       console.log(`[Receipt Analyzer] Gemini Raw Response:`, responseText);

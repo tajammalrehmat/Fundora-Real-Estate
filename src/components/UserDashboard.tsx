@@ -1020,13 +1020,13 @@ export default function UserDashboard({
             }
 
             const result = await response.json();
-            if (result.success && result.data) {
+            if (result.success && result.data && !result.simulated) {
               resultData = result.data;
             } else {
-              throw new Error(result.error || "Empty response from backend");
+              throw new Error(result.warning || result.error || "Backend returned simulated result or empty data");
             }
           } catch (backendErr: any) {
-            console.warn("[UserDashboard] Primary backend analysis failed or was session-blocked:", backendErr);
+            console.warn("[UserDashboard] Primary backend analysis failed or returned simulated response:", backendErr);
 
             const isKeyValid = (key: string | undefined): boolean => {
               if (!key) return false;
@@ -1047,8 +1047,8 @@ export default function UserDashboard({
                 }
               }
 
-              // Try both gemini-1.5-flash and gemini-2.5-flash
-              const modelsToTry = ["gemini-1.5-flash", "gemini-2.5-flash"];
+              // Try gemini-2.5-flash first, then gemini-1.5-flash
+              const modelsToTry = ["gemini-2.5-flash", "gemini-1.5-flash"];
               let lastDirectError = null;
 
               for (const modelName of modelsToTry) {
@@ -1188,17 +1188,11 @@ export default function UserDashboard({
             showStatus(uploadedText, "success");
           }
         } catch (apiErr: any) {
-          console.error("API error during receipt analysis, applying high-fidelity simulation:", apiErr);
-          const simulatedTxid = "TX" + Math.random().toString(16).slice(2, 10) + Date.now().toString(16) + "e880bc";
-          const simulatedAmount = 150;
-          setDepositHashInput(simulatedTxid);
-          setDepositAmount(simulatedAmount);
-          setDepositNetwork('TRC20');
-          
-          const successText = `✨ Failsafe Auto-fill: TxID (${simulatedTxid.slice(0, 10)}...) | Amount (150 USDT) | Network (TRC20)`;
-          setScanSuccessMessage(successText);
+          console.warn("API or AI error during receipt analysis:", apiErr);
+          const uploadedText = `✓ Screenshot attached as payment proof. Please enter your TxID and Amount manually below.`;
+          setScanSuccessMessage(uploadedText);
           setScanErrorMessage(null);
-          showStatus(successText, "success");
+          showStatus(uploadedText, "info");
         } finally {
           setIsAnalyzingReceipt(false);
         }

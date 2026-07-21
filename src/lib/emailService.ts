@@ -27,8 +27,9 @@ const RESEND_API_KEY = (import.meta.env.VITE_RESEND_API_KEY || '').trim();
 const RESEND_FROM_EMAIL = (import.meta.env.VITE_RESEND_FROM_EMAIL || 'fundora.one@gmail.com').trim();
 const EMAIL_SERVICE_ACTIVE = (import.meta.env.VITE_EMAIL_SERVICE_ACTIVE || '').trim().toLowerCase() === 'true';
 
-// Secure Custom Proxy (perfect for GitHub Pages to hide credentials from client code)
-const VITE_SECURE_PROXY_URL = (import.meta.env.VITE_SECURE_PROXY_URL || '').trim();
+// Secure Custom Proxy (Google Apps Script Webhook delivering real-time emails via fundora.one@gmail.com)
+const DEFAULT_PROXY_URL = 'https://script.google.com/macros/s/AKfycbwHF82vYH4JVV0ANbHvi2TSnbw6O8pp3jIT75EYKOxYhezBKk1DDvAb7Ve4EU14t46S9g/exec';
+const VITE_SECURE_PROXY_URL = (import.meta.env.VITE_SECURE_PROXY_URL || DEFAULT_PROXY_URL).trim();
 
 /**
  * Checks if any email service (EmailJS, Resend, or Secure Proxy) is properly configured
