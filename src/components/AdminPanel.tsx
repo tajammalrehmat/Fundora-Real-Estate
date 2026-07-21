@@ -2306,7 +2306,7 @@ export default function AdminPanel({
                     placeholder="https://fundora.one"
                     className="w-full bg-slate-950 border border-slate-850 rounded-xl px-4 py-2.5 text-slate-100 font-mono text-xs focus:outline-none focus:border-amber-500 focus:bg-slate-950"
                   />
-                  <span className="text-[8px] text-slate-500 block">The base URL where this app's Express/Vercel endpoints (like <code>/api/analyze-receipt</code> and <code>/api/send-otp</code>) are hosted. Required for receipt auto-fetching and OTP delivery to work within compiled APKs.</span>
+                  <span className="text-[8px] text-slate-500 block">The base URL where this app's API endpoints (like <code>/api/analyze-receipt</code> and <code>/api/send-otp</code>) are hosted. Required for receipt auto-fetching and OTP delivery to work within compiled APKs.</span>
                 </div>
 
                 {/* Gemini API Key for direct client-side fallback */}
