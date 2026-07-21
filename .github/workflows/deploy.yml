@@ -27,12 +27,12 @@ jobs:
 
       - name: Build App
         env:
-          VITE_RESEND_API_KEY: ${{ secrets.VITE_RESEND_API_KEY || vars.VITE_RESEND_API_KEY }}
+          VITE_RESEND_API_KEY: ${{ secrets.VITE_RESEND_API_KEY || secrets.RESEND_API_KEY || vars.VITE_RESEND_API_KEY || vars.RESEND_API_KEY }}
           VITE_EMAIL_SERVICE_ACTIVE: "true"
-          VITE_RESEND_FROM_EMAIL: ${{ secrets.VITE_RESEND_FROM_EMAIL || vars.VITE_RESEND_FROM_EMAIL || 'no-reply@fundora.one' }}
-          VITE_EMAILJS_SERVICE_ID: ${{ secrets.VITE_EMAILJS_SERVICE_ID || vars.VITE_EMAILJS_SERVICE_ID }}
-          VITE_EMAILJS_TEMPLATE_ID: ${{ secrets.VITE_EMAILJS_TEMPLATE_ID || vars.VITE_EMAILJS_TEMPLATE_ID }}
-          VITE_EMAILJS_PUBLIC_KEY: ${{ secrets.VITE_EMAILJS_PUBLIC_KEY || vars.VITE_EMAILJS_PUBLIC_KEY }}
+          VITE_RESEND_FROM_EMAIL: ${{ secrets.VITE_RESEND_FROM_EMAIL || secrets.RESEND_FROM_EMAIL || vars.VITE_RESEND_FROM_EMAIL || vars.RESEND_FROM_EMAIL || 'no-reply@fundora.one' }}
+          VITE_EMAILJS_SERVICE_ID: ${{ secrets.VITE_EMAILJS_SERVICE_ID || secrets.EMAILJS_SERVICE_ID || vars.VITE_EMAILJS_SERVICE_ID || vars.EMAILJS_SERVICE_ID }}
+          VITE_EMAILJS_TEMPLATE_ID: ${{ secrets.VITE_EMAILJS_TEMPLATE_ID || secrets.EMAILJS_TEMPLATE_ID || vars.VITE_EMAILJS_TEMPLATE_ID || vars.EMAILJS_TEMPLATE_ID }}
+          VITE_EMAILJS_PUBLIC_KEY: ${{ secrets.VITE_EMAILJS_PUBLIC_KEY || secrets.EMAILJS_PUBLIC_KEY || vars.VITE_EMAILJS_PUBLIC_KEY || vars.EMAILJS_PUBLIC_KEY }}
         run: npm run build
 
       - name: Deploy to GitHub Pages

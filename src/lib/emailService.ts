@@ -89,13 +89,7 @@ export const sendOtpEmail = async (params: EmailParams): Promise<{ success: bool
         };
       }
       
-      // If server explicitly said API key is missing, propagate that clearly so the developer knows
-      if (errorDetail.includes('API Key is not configured on the server')) {
-        return {
-          success: false,
-          error: errorDetail
-        };
-      }
+      console.log("[Email Service] Server proxy not fully configured, but client fallback is available. Continuing to direct client delivery...");
     }
   } catch (err: any) {
     console.warn(`Resend API Proxy unreachable or failed: ${err.message || 'Unknown error'}. Trying fallback options...`);
@@ -229,6 +223,6 @@ Fundora
   // If we reach here, all email channels failed. Return clear info.
   return {
     success: false,
-    error: 'All email delivery channels failed (unreachable proxy server or missing API configuration). Please ensure your device is online, and your Vercel RESEND_API_KEY environment variable is correctly configured.'
+    error: 'Email Delivery Failed: All delivery channels failed. Please ensure your Resend API Key is correctly set as VITE_RESEND_API_KEY in your GitHub Repository Secrets (for GitHub Pages), or RESEND_API_KEY in your Vercel Environment Variables. Also, confirm that your sending domain (e.g., fundora.one) is fully verified and active inside your Resend dashboard, and that your Resend account has not reached its sending limits.'
   };
 };
