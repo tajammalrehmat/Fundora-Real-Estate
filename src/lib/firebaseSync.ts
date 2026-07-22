@@ -184,7 +184,9 @@ export const loadUsersFromFirebase = async (): Promise<UserAccount[] | null> => 
           console.warn('Error updating cleaned user doc in Firestore:', err);
         }
       }
-      cleanedUsers.push(updatedUser);
+      if (updatedUser.email && updatedUser.email.trim().toLowerCase() !== 'no-reply@fundora.one') {
+        cleanedUsers.push(updatedUser);
+      }
     }
 
     return cleanedUsers;
@@ -286,8 +288,8 @@ export const subscribeToUsersCollection = (callback: (users: UserAccount[]) => v
             email: cleanEmail,
             password: u.password ? u.password.trim() : u.password
           };
-        }).filter(Boolean);
-        callback(users);
+        }).filter(u => u && u.email && u.email.trim().toLowerCase() !== 'no-reply@fundora.one');
+        callback(users as UserAccount[]);
       }
     }, (err) => {
       console.warn('Real-time users subscription error:', err);

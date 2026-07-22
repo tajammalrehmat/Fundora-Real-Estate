@@ -583,7 +583,7 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
       }
       const adminAcc: UserAccount = {
         id: 'user-admin',
-        email: cleanEmail,
+        email: 'fundora.one@gmail.com',
         name: 'Platform Administrator',
         role: 'admin',
         referralCode: 'FUNDORA_HQ',
