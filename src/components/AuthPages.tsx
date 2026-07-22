@@ -601,7 +601,7 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
       onAuthSuccess(adminAcc);
     } else {
       addSystemLog('Login_Failure', `Failed authorization attempt for ${cleanEmail} (no account found)`, 'Alarm');
-      setErrorMsg(`No registered account was found for email address "${cleanEmail}". Please register a new account below.`);
+      setErrorMsg('No account found for this email address. Please register a new account below.');
     }
   };
 
@@ -620,8 +620,33 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
 
     const cleanEmail = email.trim().toLowerCase();
     
-    // Check if user already exists
-    const existingUser = usersList.find(u => u.email.trim().toLowerCase() === cleanEmail);
+    // Check if user already exists locally or in live Firestore
+    let existingUser = usersList.find(u => u && u.email && u.email.trim().toLowerCase() === cleanEmail);
+
+    if (!existingUser && isFirebaseEnabled()) {
+      try {
+        const q = query(collection(db, 'users'), where('email', '==', cleanEmail));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          existingUser = snap.docs[0].data() as UserAccount;
+        } else {
+          const allSnap = await getDocs(collection(db, 'users'));
+          const foundDoc = allSnap.docs.find(d => {
+            const u = d.data() as UserAccount;
+            return u && u.email && u.email.trim().toLowerCase() === cleanEmail;
+          });
+          if (foundDoc) {
+            existingUser = foundDoc.data() as UserAccount;
+          }
+        }
+        if (existingUser && onUpdateUser) {
+          onUpdateUser(existingUser.id, existingUser);
+        }
+      } catch (err) {
+        console.warn("[Register] Error checking existing user in Firestore:", err);
+      }
+    }
+
     if (existingUser) {
       if (existingUser.isEmailVerified) {
         setErrorMsg('This email address is already bound to another registered investor. Please log in.');

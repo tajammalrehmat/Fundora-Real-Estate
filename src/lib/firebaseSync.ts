@@ -13,7 +13,8 @@ import {
   getDoc,
   deleteDoc,
   query,
-  where
+  where,
+  onSnapshot
 } from 'firebase/firestore';
 import { 
   INITIAL_PROJECTS, 
@@ -160,25 +161,30 @@ export const loadUsersFromFirebase = async (): Promise<UserAccount[] | null> => 
     const users = snapshot.docs.map(d => d.data() as UserAccount);
     
     // Automatically migrate old admin email to fundora.one@gmail.com and clean email strings
-    let migrated = false;
-    const cleanedUsers = users.map(u => {
-      if (!u) return u;
-      const cleanEmail = u.email ? u.email.trim() : '';
-      let updatedUser = { ...u, email: cleanEmail || u.email };
+    const cleanedUsers: UserAccount[] = [];
+    for (const u of users) {
+      if (!u) continue;
+      const originalEmail = u.email || '';
+      const cleanEmail = originalEmail.trim();
+      let updatedUser = { 
+        ...u, 
+        email: cleanEmail,
+        password: u.password ? u.password.trim() : u.password
+      };
 
       if (updatedUser.id === 'user-admin' && (updatedUser.email === 'admin@fundora.one' || updatedUser.email === 'no-reply@fundora.one')) {
-        migrated = true;
         updatedUser = { ...updatedUser, email: 'fundora.one@gmail.com' };
       }
-      return updatedUser;
-    });
 
-    if (migrated) {
-      const adminUserObj = cleanedUsers.find(u => u && u.id === 'user-admin');
-      if (adminUserObj) {
-        // Save the updated user back to Firebase
-        await setDoc(doc(db, 'users', adminUserObj.id), adminUserObj);
+      // If email/password was untrimmed, update Firestore document directly
+      if (updatedUser.email !== originalEmail || originalEmail !== originalEmail.trim()) {
+        try {
+          await setDoc(doc(db, 'users', updatedUser.id), updatedUser);
+        } catch (err) {
+          console.warn('Error updating cleaned user doc in Firestore:', err);
+        }
       }
+      cleanedUsers.push(updatedUser);
     }
 
     return cleanedUsers;
@@ -248,11 +254,47 @@ export const saveProjectToFirebase = async (proj: RealEstateProject) => {
 };
 
 export const saveUserToFirebase = async (user: UserAccount) => {
-  if (!isFirebaseEnabled()) return;
+  if (!isFirebaseEnabled() || !user || !user.id) return;
   try {
-    await setDoc(doc(db, 'users', user.id), user);
+    const cleanEmail = user.email ? user.email.trim() : '';
+    const cleanUser: UserAccount = {
+      ...user,
+      email: cleanEmail,
+      password: user.password ? user.password.trim() : user.password,
+      name: user.name ? user.name.trim() : user.name
+    };
+    await setDoc(doc(db, 'users', cleanUser.id), cleanUser);
   } catch (e) {
     console.error('Failed to save user to Firebase:', e);
+  }
+};
+
+export const subscribeToUsersCollection = (callback: (users: UserAccount[]) => void) => {
+  if (!isFirebaseEnabled()) return () => {};
+  try {
+    return onSnapshot(collection(db, 'users'), (snapshot) => {
+      if (!snapshot.empty) {
+        const users = snapshot.docs.map(d => {
+          const u = d.data() as UserAccount;
+          if (!u || !u.email) return u;
+          let cleanEmail = u.email.trim();
+          if (u.id === 'user-admin' && (cleanEmail === 'admin@fundora.one' || cleanEmail === 'no-reply@fundora.one')) {
+            cleanEmail = 'fundora.one@gmail.com';
+          }
+          return {
+            ...u,
+            email: cleanEmail,
+            password: u.password ? u.password.trim() : u.password
+          };
+        }).filter(Boolean);
+        callback(users);
+      }
+    }, (err) => {
+      console.warn('Real-time users subscription error:', err);
+    });
+  } catch (err) {
+    console.warn('Failed to setup users snapshot listener:', err);
+    return () => {};
   }
 };
 

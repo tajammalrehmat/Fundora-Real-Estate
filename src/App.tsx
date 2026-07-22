@@ -34,7 +34,8 @@ import {
   saveSystemSettingsToFirebase,
   loadInquiriesFromFirebase,
   saveInquiryToFirebase,
-  deleteInquiryFromFirebase
+  deleteInquiryFromFirebase,
+  subscribeToUsersCollection
 } from './lib/firebaseSync';
 
 // Safe localStorage helper to prevent QuotaExceededError crashes with large attachments
@@ -602,6 +603,30 @@ export default function App() {
     };
 
     initializeFirebaseData();
+  }, []);
+
+  // Live real-time Firestore database subscription for user accounts across Web & APK
+  useEffect(() => {
+    if (!isFirebaseEnabled()) return;
+    const unsubscribe = subscribeToUsersCollection((liveUsers) => {
+      if (liveUsers && liveUsers.length > 0) {
+        setUsersListState(prev => {
+          const merged = [...prev];
+          liveUsers.forEach(fbUser => {
+            if (!fbUser || !fbUser.email) return;
+            const fbEmailClean = fbUser.email.trim().toLowerCase();
+            const idx = merged.findIndex(u => u && u.email && u.email.trim().toLowerCase() === fbEmailClean);
+            if (idx > -1) {
+              merged[idx] = { ...merged[idx], ...fbUser, email: fbUser.email.trim() };
+            } else {
+              merged.push({ ...fbUser, email: fbUser.email.trim() });
+            }
+          });
+          return merged;
+        });
+      }
+    });
+    return () => unsubscribe();
   }, []);
 
   // Automated background daily rollover check
