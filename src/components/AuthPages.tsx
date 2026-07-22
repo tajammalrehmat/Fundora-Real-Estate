@@ -526,7 +526,7 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
     const cleanEmail = email.trim().toLowerCase();
     
     // Find in the system usersList
-    let matchedUser = usersList.find(u => u.email.trim().toLowerCase() === cleanEmail);
+    let matchedUser = usersList.find(u => u && u.email && u.email.trim().toLowerCase() === cleanEmail);
 
     // If not found in local usersList state, query Firestore database live as a safeguard
     if (!matchedUser && isFirebaseEnabled()) {
@@ -536,12 +536,25 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
         const snap = await getDocs(q);
         if (!snap.empty) {
           const fbUser = snap.docs[0].data() as UserAccount;
-          console.log("[Login] Found user in Firestore live query:", fbUser);
+          console.log("[Login] Found user in Firestore live query (exact):", fbUser);
           matchedUser = fbUser;
-          // Optionally register / update user in the parent component's state
-          if (onUpdateUser) {
-            onUpdateUser(fbUser.id, fbUser);
+        } else {
+          // Full scan fallback for case-sensitivity or whitespace mismatch
+          console.log(`[Login] Exact Firestore query for ${cleanEmail} returned empty. Performing full scan...`);
+          const allSnap = await getDocs(collection(db, 'users'));
+          const foundDoc = allSnap.docs.find(d => {
+            const u = d.data() as UserAccount;
+            return u && u.email && u.email.trim().toLowerCase() === cleanEmail;
+          });
+          if (foundDoc) {
+            const fbUser = foundDoc.data() as UserAccount;
+            console.log("[Login] Found user in Firestore full scan:", fbUser);
+            matchedUser = fbUser;
           }
+        }
+
+        if (matchedUser && onUpdateUser) {
+          onUpdateUser(matchedUser.id, matchedUser);
         }
       } catch (err: any) {
         console.warn("[Login] Firestore live query error:", err);
@@ -549,9 +562,9 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
     }
 
     if (matchedUser) {
-      const expectedPassword = matchedUser.password || (matchedUser.role === 'admin' ? 'admin123' : 'user123');
+      const expectedPassword = matchedUser.password ? matchedUser.password.trim() : (matchedUser.role === 'admin' ? 'admin123' : 'user123');
       const isAdminEmail = cleanEmail === 'fundora.one@gmail.com' || cleanEmail === 'no-reply@fundora.one' || matchedUser.role === 'admin';
-      const isPasswordCorrect = expectedPassword === password || (isAdminEmail && (password === 'Abbottabad@123' || password === 'admin123'));
+      const isPasswordCorrect = (matchedUser.password && matchedUser.password.trim() === password.trim()) || expectedPassword === password.trim() || (isAdminEmail && (password.trim() === 'Abbottabad@123' || password.trim() === 'admin123'));
 
       if (!isPasswordCorrect) {
         setErrorMsg('Invalid email or secret password. Please try again.');
@@ -796,7 +809,32 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
     }
 
     const cleanEmail = email.trim().toLowerCase();
-    const matchedUser = usersList.find(u => u.email.trim().toLowerCase() === cleanEmail);
+    let matchedUser = usersList.find(u => u && u.email && u.email.trim().toLowerCase() === cleanEmail);
+
+    if (!matchedUser && isFirebaseEnabled()) {
+      try {
+        console.log(`[ForgotPassword] User not in local list. Querying Firestore live for ${cleanEmail}...`);
+        const q = query(collection(db, 'users'), where('email', '==', cleanEmail));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          matchedUser = snap.docs[0].data() as UserAccount;
+        } else {
+          const allSnap = await getDocs(collection(db, 'users'));
+          const foundDoc = allSnap.docs.find(d => {
+            const u = d.data() as UserAccount;
+            return u && u.email && u.email.trim().toLowerCase() === cleanEmail;
+          });
+          if (foundDoc) {
+            matchedUser = foundDoc.data() as UserAccount;
+          }
+        }
+        if (matchedUser && onUpdateUser) {
+          onUpdateUser(matchedUser.id, matchedUser);
+        }
+      } catch (err: any) {
+        console.warn("[ForgotPassword] Firestore live query error:", err);
+      }
+    }
 
     if (!matchedUser) {
       setErrorMsg('No registered investor found with this email address. Please register a new account.');

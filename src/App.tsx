@@ -545,12 +545,14 @@ export default function App() {
           setUsersListState(prev => {
             const merged = [...prev];
             users.forEach(fbUser => {
-              const idx = merged.findIndex(u => u.email.trim().toLowerCase() === fbUser.email.trim().toLowerCase());
+              if (!fbUser || !fbUser.email) return;
+              const fbEmailClean = fbUser.email.trim().toLowerCase();
+              const idx = merged.findIndex(u => u && u.email && u.email.trim().toLowerCase() === fbEmailClean);
               if (idx > -1) {
                 // Merge database record over local copy, prioritizing cloud details
-                merged[idx] = { ...merged[idx], ...fbUser };
+                merged[idx] = { ...merged[idx], ...fbUser, email: fbUser.email.trim() };
               } else {
-                merged.push(fbUser);
+                merged.push({ ...fbUser, email: fbUser.email.trim() });
               }
             });
             return merged;

@@ -159,25 +159,29 @@ export const loadUsersFromFirebase = async (): Promise<UserAccount[] | null> => 
     if (snapshot.empty) return [INITIAL_USER, INITIAL_ADMIN];
     const users = snapshot.docs.map(d => d.data() as UserAccount);
     
-    // Automatically migrate old admin email to fundora.one@gmail.com if found
+    // Automatically migrate old admin email to fundora.one@gmail.com and clean email strings
     let migrated = false;
-    const migratedUsers = users.map(u => {
-      if (u.id === 'user-admin' && (u.email === 'admin@fundora.one' || u.email === 'no-reply@fundora.one')) {
+    const cleanedUsers = users.map(u => {
+      if (!u) return u;
+      const cleanEmail = u.email ? u.email.trim() : '';
+      let updatedUser = { ...u, email: cleanEmail || u.email };
+
+      if (updatedUser.id === 'user-admin' && (updatedUser.email === 'admin@fundora.one' || updatedUser.email === 'no-reply@fundora.one')) {
         migrated = true;
-        return { ...u, email: 'fundora.one@gmail.com' };
+        updatedUser = { ...updatedUser, email: 'fundora.one@gmail.com' };
       }
-      return u;
+      return updatedUser;
     });
 
     if (migrated) {
-      const adminUserObj = migratedUsers.find(u => u.id === 'user-admin');
+      const adminUserObj = cleanedUsers.find(u => u && u.id === 'user-admin');
       if (adminUserObj) {
         // Save the updated user back to Firebase
         await setDoc(doc(db, 'users', adminUserObj.id), adminUserObj);
       }
     }
 
-    return migratedUsers;
+    return cleanedUsers;
   } catch (e) {
     console.error('Error loading users from Firebase:', e);
     return null;
