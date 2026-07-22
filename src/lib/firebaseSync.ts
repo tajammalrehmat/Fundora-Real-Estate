@@ -271,6 +271,51 @@ export const saveUserToFirebase = async (user: UserAccount) => {
   }
 };
 
+export const deleteUserFromFirebase = async (id: string) => {
+  if (!isFirebaseEnabled()) return;
+  try {
+    await deleteDoc(doc(db, 'users', id));
+  } catch (e) {
+    console.error('Failed to delete user from Firebase:', e);
+  }
+};
+
+export const deleteTransactionFromFirebase = async (id: string) => {
+  if (!isFirebaseEnabled()) return;
+  try {
+    await deleteDoc(doc(db, 'transactions', id));
+  } catch (e) {
+    console.error('Failed to delete transaction from Firebase:', e);
+  }
+};
+
+export const deleteInvestmentFromFirebase = async (id: string) => {
+  if (!isFirebaseEnabled()) return;
+  try {
+    await deleteDoc(doc(db, 'investments', id));
+  } catch (e) {
+    console.error('Failed to delete investment from Firebase:', e);
+  }
+};
+
+export const deleteClaimFromFirebase = async (id: string) => {
+  if (!isFirebaseEnabled()) return;
+  try {
+    await deleteDoc(doc(db, 'claims', id));
+  } catch (e) {
+    console.error('Failed to delete claim from Firebase:', e);
+  }
+};
+
+export const deleteSecurityLogFromFirebase = async (id: string) => {
+  if (!isFirebaseEnabled()) return;
+  try {
+    await deleteDoc(doc(db, 'security_logs', id));
+  } catch (e) {
+    console.error('Failed to delete security log from Firebase:', e);
+  }
+};
+
 export const subscribeToUsersCollection = (callback: (users: UserAccount[]) => void) => {
   if (!isFirebaseEnabled()) return () => {};
   try {
@@ -290,6 +335,8 @@ export const subscribeToUsersCollection = (callback: (users: UserAccount[]) => v
           };
         }).filter(u => u && u.email && u.email.trim().toLowerCase() !== 'no-reply@fundora.one');
         callback(users as UserAccount[]);
+      } else {
+        callback([]);
       }
     }, (err) => {
       console.warn('Real-time users subscription error:', err);
@@ -308,6 +355,8 @@ export const subscribeToTransactionsCollection = (callback: (txs: Transaction[])
         const txs = snapshot.docs.map(d => d.data() as Transaction);
         txs.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
         callback(txs);
+      } else {
+        callback([]);
       }
     }, (err) => {
       console.warn('Real-time transactions subscription error:', err);
@@ -325,6 +374,8 @@ export const subscribeToInvestmentsCollection = (callback: (invs: InvestmentReco
       if (!snapshot.empty) {
         const invs = snapshot.docs.map(d => d.data() as InvestmentRecord);
         callback(invs);
+      } else {
+        callback([]);
       }
     }, (err) => {
       console.warn('Real-time investments subscription error:', err);
@@ -342,12 +393,72 @@ export const subscribeToProjectsCollection = (callback: (projs: RealEstateProjec
       if (!snapshot.empty) {
         const projs = snapshot.docs.map(d => d.data() as RealEstateProject);
         callback(projs);
+      } else {
+        callback([]);
       }
     }, (err) => {
       console.warn('Real-time projects subscription error:', err);
     });
   } catch (err) {
     console.warn('Failed to setup projects snapshot listener:', err);
+    return () => {};
+  }
+};
+
+export const subscribeToClaimsCollection = (callback: (claims: ProfitClaimRecord[]) => void) => {
+  if (!isFirebaseEnabled()) return () => {};
+  try {
+    return onSnapshot(collection(db, 'claims'), (snapshot) => {
+      if (!snapshot.empty) {
+        const claims = snapshot.docs.map(d => d.data() as ProfitClaimRecord);
+        callback(claims);
+      } else {
+        callback([]);
+      }
+    }, (err) => {
+      console.warn('Real-time claims subscription error:', err);
+    });
+  } catch (err) {
+    console.warn('Failed to setup claims snapshot listener:', err);
+    return () => {};
+  }
+};
+
+export const subscribeToSecurityLogsCollection = (callback: (logs: SecurityLog[]) => void) => {
+  if (!isFirebaseEnabled()) return () => {};
+  try {
+    return onSnapshot(collection(db, 'security_logs'), (snapshot) => {
+      if (!snapshot.empty) {
+        const logs = snapshot.docs.map(d => d.data() as SecurityLog);
+        callback(logs);
+      } else {
+        callback([]);
+      }
+    }, (err) => {
+      console.warn('Real-time security logs subscription error:', err);
+    });
+  } catch (err) {
+    console.warn('Failed to setup security logs snapshot listener:', err);
+    return () => {};
+  }
+};
+
+export const subscribeToSystemSettings = (callback: (settings: SystemSettings) => void) => {
+  if (!isFirebaseEnabled()) return () => {};
+  try {
+    return onSnapshot(doc(db, 'system_settings', 'default'), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data() as SystemSettings;
+        if (data.apiUrl && data.apiUrl.includes('fundora.one')) {
+          data.apiUrl = 'https://ais-pre-hb5de275kkaohqffdp2qfz-614235734610.asia-southeast1.run.app';
+        }
+        callback(data);
+      }
+    }, (err) => {
+      console.warn('Real-time system settings subscription error:', err);
+    });
+  } catch (err) {
+    console.warn('Failed to setup system settings snapshot listener:', err);
     return () => {};
   }
 };
@@ -405,7 +516,7 @@ export const loadSystemSettingsFromFirebase = async (): Promise<SystemSettings |
     usdtBep20Address: '0x71C7656EC7ab88b098defB751B7401B5f6d8976F',
     scanGateTitle: 'Barcode Scanning Gateway',
     scanGateSubtitle: 'Dispatch on the matching blockchain. Tokens sent to mismatched networks are irreversibly lost.',
-    apiUrl: 'https://fundora.one'
+    apiUrl: 'https://ais-pre-hb5de275kkaohqffdp2qfz-614235734610.asia-southeast1.run.app'
   };
 
   if (!isFirebaseEnabled()) return null;
@@ -414,7 +525,7 @@ export const loadSystemSettingsFromFirebase = async (): Promise<SystemSettings |
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
       const data = docSnap.data() as SystemSettings;
-      if (!data.apiUrl || data.apiUrl.trim().length < 10) {
+      if (!data.apiUrl || data.apiUrl.trim().length < 10 || data.apiUrl.includes('fundora.one')) {
         data.apiUrl = defaultSettings.apiUrl;
       }
       return data;
@@ -431,7 +542,11 @@ export const loadSystemSettingsFromFirebase = async (): Promise<SystemSettings |
 export const saveSystemSettingsToFirebase = async (settings: SystemSettings) => {
   if (!isFirebaseEnabled()) return;
   try {
-    await setDoc(doc(db, 'system_settings', 'default'), settings);
+    const cleanSettings = {
+      ...settings,
+      apiUrl: (settings.apiUrl && !settings.apiUrl.includes('fundora.one')) ? settings.apiUrl : 'https://ais-pre-hb5de275kkaohqffdp2qfz-614235734610.asia-southeast1.run.app'
+    };
+    await setDoc(doc(db, 'system_settings', 'default'), cleanSettings);
   } catch (e) {
     console.error('Failed to save system settings to Firebase:', e);
   }

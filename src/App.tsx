@@ -29,6 +29,11 @@ import {
   saveClaimToFirebase,
   saveSecurityLogToFirebase,
   deleteProjectFromFirebase,
+  deleteUserFromFirebase,
+  deleteTransactionFromFirebase,
+  deleteInvestmentFromFirebase,
+  deleteClaimFromFirebase,
+  deleteSecurityLogFromFirebase,
   isFirebaseEnabled,
   loadSystemSettingsFromFirebase,
   saveSystemSettingsToFirebase,
@@ -38,7 +43,10 @@ import {
   subscribeToUsersCollection,
   subscribeToTransactionsCollection,
   subscribeToInvestmentsCollection,
-  subscribeToProjectsCollection
+  subscribeToProjectsCollection,
+  subscribeToClaimsCollection,
+  subscribeToSecurityLogsCollection,
+  subscribeToSystemSettings
 } from './lib/firebaseSync';
 
 // Safe localStorage helper to prevent QuotaExceededError crashes with large attachments
@@ -430,84 +438,55 @@ export default function App() {
     return () => clearInterval(interval);
   }, [clockOffset]);
 
-  // Auto-Persist states to browser local storage & Firestore (Only after initial synchronization completes!)
+  // Local Caching Effects (Save to browser cache for offline access, without re-writing to Firebase)
   useEffect(() => {
     safeSetLocalStorage('inv_projects', JSON.stringify(projectsList));
-    if (isFirebaseSynced && isFirebaseEnabled() && !isInitialSyncRef.current) {
-      projectsList.forEach(proj => saveProjectToFirebase(proj));
-    }
-  }, [projectsList, isFirebaseSynced]);
+  }, [projectsList]);
 
   useEffect(() => {
     safeSetLocalStorage('inv_transactions', JSON.stringify(transactionsList));
-    if (isFirebaseSynced && isFirebaseEnabled() && !isInitialSyncRef.current) {
-      transactionsList.forEach(tx => saveTransactionToFirebase(tx));
-    }
-  }, [transactionsList, isFirebaseSynced]);
+  }, [transactionsList]);
 
   useEffect(() => {
     safeSetLocalStorage('inv_users', JSON.stringify(usersListState));
-    if (isFirebaseSynced && isFirebaseEnabled() && !isInitialSyncRef.current) {
-      usersListState.forEach(user => saveUserToFirebase(user));
-    }
-  }, [usersListState, isFirebaseSynced]);
+  }, [usersListState]);
 
   useEffect(() => {
     safeSetLocalStorage('inv_active_user', activeUser ? JSON.stringify(activeUser) : '');
-    if (isFirebaseSynced && isFirebaseEnabled() && activeUser && !isInitialSyncRef.current) {
-      saveUserToFirebase(activeUser);
-    }
-  }, [activeUser, isFirebaseSynced]);
+  }, [activeUser]);
 
   useEffect(() => {
     safeSetLocalStorage('inv_investments', JSON.stringify(investmentsList));
-    if (isFirebaseSynced && isFirebaseEnabled() && !isInitialSyncRef.current) {
-      investmentsList.forEach(inv => saveInvestmentToFirebase(inv));
-    }
-  }, [investmentsList, isFirebaseSynced]);
+  }, [investmentsList]);
 
   useEffect(() => {
     safeSetLocalStorage('inv_claims', JSON.stringify(claimsHistory));
-    if (isFirebaseSynced && isFirebaseEnabled() && !isInitialSyncRef.current) {
-      claimsHistory.forEach(cl => saveClaimToFirebase(cl));
-    }
-  }, [claimsHistory, isFirebaseSynced]);
+  }, [claimsHistory]);
 
   useEffect(() => {
     safeSetLocalStorage('inv_security_logs', JSON.stringify(securityLogsList));
-    if (isFirebaseSynced && isFirebaseEnabled() && !isInitialSyncRef.current) {
-      securityLogsList.forEach(log => saveSecurityLogToFirebase(log));
-    }
-  }, [securityLogsList, isFirebaseSynced]);
+  }, [securityLogsList]);
 
   useEffect(() => {
     safeSetLocalStorage('inv_system_settings', JSON.stringify(systemSettings));
-    if (isFirebaseSynced && isFirebaseEnabled() && !isInitialSyncRef.current) {
-      saveSystemSettingsToFirebase(systemSettings);
-    }
-  }, [systemSettings, isFirebaseSynced]);
+  }, [systemSettings]);
 
   useEffect(() => {
     safeSetLocalStorage('inv_inquiries', JSON.stringify(inquiriesList));
-    if (isFirebaseSynced && isFirebaseEnabled() && !isInitialSyncRef.current) {
-      inquiriesList.forEach(inq => saveInquiryToFirebase(inq));
-    }
-  }, [inquiriesList, isFirebaseSynced]);
+  }, [inquiriesList]);
 
-  // Initial boot: Seed & Load everything from Firebase!
+  // Initial boot: Seed & Load everything directly from Firebase!
   useEffect(() => {
     const initializeFirebaseData = async () => {
       if (!isFirebaseEnabled()) {
-        console.warn("Firebase is not active. Falling back entirely to local storage.");
+        console.warn("Firebase is not active. Falling back to local storage.");
         setIsFirebaseSynced(true);
         return;
       }
 
-      console.log("Synchronizing with Firestore Database...");
-      // Seed first if empty
+      console.log("Synchronizing with Firestore Database as single source of truth...");
       await seedInitialDataIfEmpty();
 
-      // Load all collections safely and individually
       let projects = null;
       let users = null;
       let transactions = null;
@@ -549,22 +528,10 @@ export default function App() {
 
         if (users !== null && users.length > 0) {
           const cleanUsers = users.filter(u => u && u.email && u.email.trim().toLowerCase() !== 'no-reply@fundora.one');
-          setUsersListState(prev => {
-            const merged = [...cleanUsers];
-            prev.forEach(localUser => {
-              if (!localUser || !localUser.email) return;
-              const cleanE = localUser.email.trim().toLowerCase();
-              if (cleanE === 'no-reply@fundora.one') return;
-              const exists = merged.some(u => u && u.email && u.email.trim().toLowerCase() === cleanE);
-              if (!exists) {
-                merged.push(localUser);
-                saveUserToFirebase(localUser);
-              }
-            });
-            safeSetLocalStorage('inv_users', JSON.stringify(merged));
-            return merged;
-          });
+          setUsersListState(cleanUsers);
+          safeSetLocalStorage('inv_users', JSON.stringify(cleanUsers));
         }
+
         if (transactions !== null) setTransactionsList(transactions);
         if (investments !== null) setInvestmentsList(investments);
         if (claims !== null) setClaimsHistory(claims);
@@ -572,7 +539,7 @@ export default function App() {
         if (settings !== null) setSystemSettings(settings);
         if (inquiries !== null) setInquiriesList(inquiries);
 
-        // Also update active user from the fresh database if there was one saved in localStorage
+        // Update active user from the fresh database if there was one logged in
         const savedActiveUser = localStorage.getItem('inv_active_user');
         if (savedActiveUser) {
           try {
@@ -588,14 +555,9 @@ export default function App() {
                   setIsAppLocked(false);
                 }
               } else {
-                setActiveUser(parsed);
-                saveUserToFirebase(parsed);
-                const isLocalActive = localStorage.getItem(`inv_device_biometric_active_${parsed.email.toLowerCase().trim()}`) === 'true';
-                if (parsed.webAuthnEnabled && isAppLockedRef.current && isLocalActive) {
-                  setIsAppLocked(true);
-                } else {
-                  setIsAppLocked(false);
-                }
+                // If user no longer exists in DB, log out
+                setActiveUser(null);
+                localStorage.removeItem('inv_active_user');
               }
             }
           } catch (_) {
@@ -606,53 +568,69 @@ export default function App() {
         console.log("Firestore Synchronized successfully!");
         setIsFirebaseSynced(true);
       } catch (err) {
-        console.error("Failed to load records from Firestore on startup, using local storage", err);
-        setIsFirebaseSynced(true); // proceed using local storage fallback
+        console.error("Failed to load records from Firestore on startup", err);
+        setIsFirebaseSynced(true);
       }
     };
 
     initializeFirebaseData();
   }, []);
 
-  // Live real-time Firestore database subscription for user accounts, transactions, investments & projects across Web & APK
+  // Live real-time Firestore database subscription across all clients (Web, APK, Admin)
   useEffect(() => {
     if (!isFirebaseEnabled()) return;
+
     const unsubUsers = subscribeToUsersCollection((liveUsers) => {
-      if (liveUsers && liveUsers.length > 0) {
-        const cleanUsers = liveUsers.filter(u => u && u.email && u.email.trim().toLowerCase() !== 'no-reply@fundora.one');
-        setUsersListState(prev => {
-          const merged = [...cleanUsers];
-          prev.forEach(localUser => {
-            if (!localUser || !localUser.email) return;
-            const cleanE = localUser.email.trim().toLowerCase();
-            if (cleanE === 'no-reply@fundora.one') return;
-            const exists = merged.some(u => u && u.email && u.email.trim().toLowerCase() === cleanE);
-            if (!exists) {
-              merged.push(localUser);
-              saveUserToFirebase(localUser);
-            }
-          });
-          safeSetLocalStorage('inv_users', JSON.stringify(merged));
-          return merged;
-        });
+      if (liveUsers !== undefined) {
+        const cleanUsers = (liveUsers || []).filter(u => u && u.email && u.email.trim().toLowerCase() !== 'no-reply@fundora.one');
+        setUsersListState(cleanUsers);
+        safeSetLocalStorage('inv_users', JSON.stringify(cleanUsers));
+
+        // Keep activeUser state up-to-date with Firestore changes
+        if (activeUserRef.current) {
+          const currentE = activeUserRef.current.email.toLowerCase().trim();
+          const currentId = activeUserRef.current.id;
+          const freshActive = cleanUsers.find(u => u.id === currentId || (u.email && u.email.toLowerCase().trim() === currentE));
+          if (freshActive) {
+            setActiveUser(freshActive);
+          }
+        }
       }
     });
 
     const unsubTxs = subscribeToTransactionsCollection((liveTxs) => {
-      if (liveTxs) {
+      if (liveTxs !== undefined) {
         setTransactionsList(liveTxs);
       }
     });
 
     const unsubInvs = subscribeToInvestmentsCollection((liveInvs) => {
-      if (liveInvs) {
+      if (liveInvs !== undefined) {
         setInvestmentsList(liveInvs);
       }
     });
 
     const unsubProjs = subscribeToProjectsCollection((liveProjs) => {
-      if (liveProjs) {
+      if (liveProjs !== undefined) {
         setProjectsList(liveProjs);
+      }
+    });
+
+    const unsubClaims = subscribeToClaimsCollection((liveClaims) => {
+      if (liveClaims !== undefined) {
+        setClaimsHistory(liveClaims);
+      }
+    });
+
+    const unsubLogs = subscribeToSecurityLogsCollection((liveLogs) => {
+      if (liveLogs !== undefined) {
+        setSecurityLogsList(liveLogs);
+      }
+    });
+
+    const unsubSettings = subscribeToSystemSettings((liveSettings) => {
+      if (liveSettings) {
+        setSystemSettings(liveSettings);
       }
     });
 
@@ -661,6 +639,9 @@ export default function App() {
       unsubTxs();
       unsubInvs();
       unsubProjs();
+      unsubClaims();
+      unsubLogs();
+      unsubSettings();
     };
   }, []);
 
@@ -942,6 +923,7 @@ export default function App() {
     };
 
     setTransactionsList(prev => [newTx, ...prev]);
+    saveTransactionToFirebase(newTx);
     addSystemLog('Admin_Action', `Pending deposit request of $${amount} USDT submitted by ${activeUser.email}. Check ledger.`, 'Info');
   };
 
@@ -974,7 +956,9 @@ export default function App() {
 
     setActiveUser(updatedUser);
     setUsersListState(prev => prev.map(u => u.email === updatedUser.email ? updatedUser : u));
+    saveAndSyncUser(updatedUser);
     setTransactionsList(prev => [newTx, ...prev]);
+    saveTransactionToFirebase(newTx);
     addSystemLog('Large_Withdrawal', `Withdrawal claim of $${amount} USDT submitted by ${activeUser.email}. Net payout $${netPayout} after 20% fee.`, 'Secure');
   };
 
@@ -1037,12 +1021,19 @@ export default function App() {
       description: `Purchased ${sharesCount} fractional shares in ${project.name}`
     };
 
-    // Apply updates across lists
+    // Apply updates across lists and sync to Firestore
     setActiveUser(updatedUser);
     setUsersListState(usersListState.map(u => u.email === updatedUser.email ? updatedUser : u));
+    saveAndSyncUser(updatedUser);
+
     setProjectsList(prev => prev.map(p => p.id === updatedProject.id ? updatedProject : p));
+    saveProjectToFirebase(updatedProject);
+
     setInvestmentsList(prev => [...prev, newInvestment]);
+    saveInvestmentToFirebase(newInvestment);
+
     setTransactionsList(prev => [newTx, ...prev]);
+    saveTransactionToFirebase(newTx);
 
     addSystemLog('Large_Withdrawal', `Fractional buy complete on ${project.name}: ${sharesCount} shares worth $${totalCost} USDT.`, 'Secure');
     return { success: true };
@@ -1221,6 +1212,7 @@ export default function App() {
         if (activeUser && activeUser.id === u.id) {
           setActiveUser(updatedU);
         }
+        saveAndSyncUser(updatedU);
         return updatedU;
       }
       return u;
@@ -1254,6 +1246,7 @@ export default function App() {
         if (activeUser && activeUser.id === u.id) {
           setActiveUser(updatedU);
         }
+        saveAndSyncUser(updatedU);
         return updatedU;
       }
       return u;
@@ -1264,30 +1257,46 @@ export default function App() {
     addSystemLog('Admin_Action', `Compliance Admin reset/unbound ${network} wallet address for ${userEmail}.`, 'Secure');
   };
 
+  // Delete User permanently from Firestore
+  const handleDeleteUser = async (userId: string) => {
+    setUsersListState(prev => prev.filter(u => u.id !== userId));
+    if (activeUser && activeUser.id === userId) {
+      setActiveUser(null);
+    }
+    if (isFirebaseEnabled()) {
+      await deleteUserFromFirebase(userId);
+    }
+    addSystemLog('Admin_Action', `User account ${userId} permanently deleted from database.`, 'Secure');
+  };
+
   // Update Barcode Scanning Gateway / Scan Gate settings
   const handleUpdateSystemSettings = (newSettings: SystemSettings) => {
     setSystemSettings(newSettings);
+    saveSystemSettingsToFirebase(newSettings);
     addSystemLog('Admin_Action', `Compliance Admin updated deposit scan gate settings. TRC20 [${newSettings.usdtTrc20Address}], BEP20 [${newSettings.usdtBep20Address}]`, 'Secure');
   };
 
   // Add new property options
   const handleAddProject = (newProj: RealEstateProject) => {
     setProjectsList(prev => [newProj, ...prev]);
+    saveProjectToFirebase(newProj);
     addSystemLog('Admin_Action', `New smart property listing online: ${newProj.name} listed with ${newProj.totalShares} shares.`, 'Secure');
   };
 
   const handleUpdateProjectRoi = (projectId: string, newRoi: number) => {
-    setProjectsList(prev => prev.map(p => p.id === projectId ? { ...p, expectedRoi: newRoi } : p));
+    const updatedProjects = projectsList.map(p => p.id === projectId ? { ...p, expectedRoi: newRoi } : p);
+    setProjectsList(updatedProjects);
+    const targetProj = updatedProjects.find(p => p.id === projectId);
+    if (targetProj) saveProjectToFirebase(targetProj);
     
     // Recalibrate active investments
     setInvestmentsList(prev => prev.map(inv => {
       if (inv.projectId === projectId) {
         const duration = inv.durationMonths || 12;
         const newDailyProfit = Math.round((inv.totalCost * (newRoi / 100) / (duration * 30)) * 100) / 100;
-        return {
-          ...inv,
-          dailyProfitRate: newDailyProfit
-        };
+        const updatedInv = { ...inv, dailyProfitRate: newDailyProfit };
+        saveInvestmentToFirebase(updatedInv);
+        return updatedInv;
       }
       return inv;
     }));
@@ -1297,17 +1306,20 @@ export default function App() {
 
   const handleUpdateProject = (updatedProj: RealEstateProject) => {
     setProjectsList(prev => prev.map(p => p.id === updatedProj.id ? updatedProj : p));
+    saveProjectToFirebase(updatedProj);
     
     // Recalibrate active investments
     setInvestmentsList(prev => prev.map(inv => {
       if (inv.projectId === updatedProj.id) {
         const duration = inv.durationMonths || updatedProj.durationMonths || 12;
         const newDailyProfit = Math.round((inv.totalCost * (updatedProj.expectedRoi / 100) / (duration * 30)) * 100) / 100;
-        return {
+        const updatedInv = {
           ...inv,
           projectName: updatedProj.name,
           dailyProfitRate: newDailyProfit
         };
+        saveInvestmentToFirebase(updatedInv);
+        return updatedInv;
       }
       return inv;
     }));
@@ -1760,6 +1772,7 @@ export default function App() {
           systemSettings={systemSettings}
           onUpdateSystemSettings={handleUpdateSystemSettings}
           onUpdateUser={handleUpdateAnyUser}
+          onDeleteUser={handleDeleteUser}
           currentUser={activeUser}
         />
       )}

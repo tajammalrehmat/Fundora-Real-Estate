@@ -13,13 +13,12 @@ export const getApiUrl = (path: string): string => {
   }
 
   // 2. High priority: Check systemSettings for a configured API URL saved in localStorage
-  // This is set in the Admin Panel as 'Production Backend API URL'. If defined, we MUST respect it
-  // because the app might be hosted as static files on another origin.
+  // This is set in the Admin Panel as 'Production Backend API URL'.
   const savedSettings = localStorage.getItem('inv_system_settings');
   if (savedSettings) {
     try {
       const parsed = JSON.parse(savedSettings);
-      if (parsed.apiUrl && parsed.apiUrl.trim().length > 10) {
+      if (parsed.apiUrl && parsed.apiUrl.trim().length > 10 && !parsed.apiUrl.includes('fundora.one')) {
         return `${parsed.apiUrl.trim().replace(/\/$/, '')}${formattedPath}`;
       }
     } catch (_) {}
@@ -113,7 +112,7 @@ export const fetchWithFallback = async (path: string, options: RequestInit = {})
     }
 
     const devUrl = 'https://ais-dev-hb5de275kkaohqffdp2qfz-614235734610.asia-southeast1.run.app';
-    const preUrl = 'https://fundora.one';
+    const preUrl = 'https://ais-pre-hb5de275kkaohqffdp2qfz-614235734610.asia-southeast1.run.app';
 
     let fallbackUrl = '';
     if (primaryUrl.includes('fundora.one') || primaryUrl.includes('ais-pre-')) {

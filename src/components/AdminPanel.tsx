@@ -35,6 +35,7 @@ interface AdminPanelProps {
   systemSettings?: SystemSettings;
   onUpdateSystemSettings?: (settings: SystemSettings) => void;
   onUpdateUser?: (userId: string, updatedFields: Partial<UserAccount>) => void;
+  onDeleteUser?: (userId: string) => void;
   currentUser?: UserAccount | null;
 }
 
@@ -70,6 +71,7 @@ export default function AdminPanel({
   },
   onUpdateSystemSettings,
   onUpdateUser,
+  onDeleteUser,
   currentUser
 }: AdminPanelProps) {
   const [localAdminTab, setLocalAdminTab] = useState<'stats' | 'deposits' | 'withdrawals' | 'projects' | 'users' | 'security' | 'settings' | 'inquiries'>('stats');
@@ -1936,10 +1938,6 @@ export default function AdminPanel({
                                     <button
                                       id={`adjust-deduct-btn-${usr.id}`}
                                       onClick={() => {
-                                        if (usr.balance < adjustAmount) {
-                                          const proceed = window.confirm(`User only has $${usr.balance.toFixed(2)}. Deducting $${adjustAmount.toFixed(2)} will set their balance to $0.00. Do you want to proceed?`);
-                                          if (!proceed) return;
-                                        }
                                         if (onAdjustUserFunds) {
                                           onAdjustUserFunds(usr.id, adjustAmount, 'deduct');
                                           alert(`Successfully deducted $${adjustAmount.toFixed(2)} USDT from user ${usr.email}'s balance!`);
@@ -1955,6 +1953,23 @@ export default function AdminPanel({
                                   <span className="text-[9px] text-slate-500 italic block leading-snug">
                                     * Note: Funds transactions are processed instantaneously and added to system ledgers.
                                   </span>
+
+                                  {onDeleteUser && usr.role !== 'admin' && (
+                                    <button
+                                      id={`delete-user-btn-${usr.id}`}
+                                      onClick={() => {
+                                        const confirmDel = window.confirm(`Are you sure you want to PERMANENTLY delete user account ${usr.email} (${usr.id}) from the database? This action cannot be undone.`);
+                                        if (confirmDel) {
+                                          onDeleteUser(usr.id);
+                                          alert(`User account ${usr.email} has been permanently deleted from Firebase database.`);
+                                        }
+                                      }}
+                                      className="w-full py-2 bg-red-600/20 hover:bg-red-600/40 border border-red-500/40 text-red-300 font-bold uppercase rounded-lg text-[10px] tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer mt-3"
+                                    >
+                                      <AlertOctagon className="w-3.5 h-3.5 text-red-400" />
+                                      <span>Permanently Delete User Account</span>
+                                    </button>
+                                  )}
                                 </div>
 
                               </div>
