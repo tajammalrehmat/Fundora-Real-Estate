@@ -610,20 +610,8 @@ export default function App() {
     if (!isFirebaseEnabled()) return;
     const unsubscribe = subscribeToUsersCollection((liveUsers) => {
       if (liveUsers && liveUsers.length > 0) {
-        setUsersListState(prev => {
-          const merged = [...prev];
-          liveUsers.forEach(fbUser => {
-            if (!fbUser || !fbUser.email) return;
-            const fbEmailClean = fbUser.email.trim().toLowerCase();
-            const idx = merged.findIndex(u => u && u.email && u.email.trim().toLowerCase() === fbEmailClean);
-            if (idx > -1) {
-              merged[idx] = { ...merged[idx], ...fbUser, email: fbUser.email.trim() };
-            } else {
-              merged.push({ ...fbUser, email: fbUser.email.trim() });
-            }
-          });
-          return merged;
-        });
+        setUsersListState(liveUsers);
+        safeSetLocalStorage('inv_users', JSON.stringify(liveUsers));
       }
     });
     return () => unsubscribe();
