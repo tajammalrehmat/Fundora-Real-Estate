@@ -46,13 +46,13 @@ let auth: any;
 try {
   app = getApps().length > 0 ? getApps()[0] : initializeApp(firebaseConfig);
   try {
-    db = getFirestore(app, FIREBASE_DATABASE_ID);
-    console.log(`[Firebase] Firestore initialized successfully for database ID: ${FIREBASE_DATABASE_ID}`);
-  } catch (err) {
-    console.warn("[Firebase] getFirestore failed, attempting initializeFirestore:", err);
     db = initializeFirestore(app, {
       experimentalAutoDetectLongPolling: true
     }, FIREBASE_DATABASE_ID);
+    console.log(`[Firebase] Firestore initialized with auto long-polling for database ID: ${FIREBASE_DATABASE_ID}`);
+  } catch (err) {
+    console.warn("[Firebase] initializeFirestore failed, falling back to getFirestore:", err);
+    db = getFirestore(app, FIREBASE_DATABASE_ID);
   }
   auth = getAuth(app);
 } catch (error) {

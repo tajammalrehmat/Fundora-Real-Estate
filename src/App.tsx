@@ -35,7 +35,10 @@ import {
   loadInquiriesFromFirebase,
   saveInquiryToFirebase,
   deleteInquiryFromFirebase,
-  subscribeToUsersCollection
+  subscribeToUsersCollection,
+  subscribeToTransactionsCollection,
+  subscribeToInvestmentsCollection,
+  subscribeToProjectsCollection
 } from './lib/firebaseSync';
 
 // Safe localStorage helper to prevent QuotaExceededError crashes with large attachments
@@ -611,10 +614,10 @@ export default function App() {
     initializeFirebaseData();
   }, []);
 
-  // Live real-time Firestore database subscription for user accounts across Web & APK
+  // Live real-time Firestore database subscription for user accounts, transactions, investments & projects across Web & APK
   useEffect(() => {
     if (!isFirebaseEnabled()) return;
-    const unsubscribe = subscribeToUsersCollection((liveUsers) => {
+    const unsubUsers = subscribeToUsersCollection((liveUsers) => {
       if (liveUsers && liveUsers.length > 0) {
         const cleanUsers = liveUsers.filter(u => u && u.email && u.email.trim().toLowerCase() !== 'no-reply@fundora.one');
         setUsersListState(prev => {
@@ -634,7 +637,31 @@ export default function App() {
         });
       }
     });
-    return () => unsubscribe();
+
+    const unsubTxs = subscribeToTransactionsCollection((liveTxs) => {
+      if (liveTxs) {
+        setTransactionsList(liveTxs);
+      }
+    });
+
+    const unsubInvs = subscribeToInvestmentsCollection((liveInvs) => {
+      if (liveInvs) {
+        setInvestmentsList(liveInvs);
+      }
+    });
+
+    const unsubProjs = subscribeToProjectsCollection((liveProjs) => {
+      if (liveProjs) {
+        setProjectsList(liveProjs);
+      }
+    });
+
+    return () => {
+      unsubUsers();
+      unsubTxs();
+      unsubInvs();
+      unsubProjs();
+    };
   }, []);
 
   // Automated background daily rollover check

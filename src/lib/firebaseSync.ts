@@ -300,6 +300,58 @@ export const subscribeToUsersCollection = (callback: (users: UserAccount[]) => v
   }
 };
 
+export const subscribeToTransactionsCollection = (callback: (txs: Transaction[]) => void) => {
+  if (!isFirebaseEnabled()) return () => {};
+  try {
+    return onSnapshot(collection(db, 'transactions'), (snapshot) => {
+      if (!snapshot.empty) {
+        const txs = snapshot.docs.map(d => d.data() as Transaction);
+        txs.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+        callback(txs);
+      }
+    }, (err) => {
+      console.warn('Real-time transactions subscription error:', err);
+    });
+  } catch (err) {
+    console.warn('Failed to setup transactions snapshot listener:', err);
+    return () => {};
+  }
+};
+
+export const subscribeToInvestmentsCollection = (callback: (invs: InvestmentRecord[]) => void) => {
+  if (!isFirebaseEnabled()) return () => {};
+  try {
+    return onSnapshot(collection(db, 'investments'), (snapshot) => {
+      if (!snapshot.empty) {
+        const invs = snapshot.docs.map(d => d.data() as InvestmentRecord);
+        callback(invs);
+      }
+    }, (err) => {
+      console.warn('Real-time investments subscription error:', err);
+    });
+  } catch (err) {
+    console.warn('Failed to setup investments snapshot listener:', err);
+    return () => {};
+  }
+};
+
+export const subscribeToProjectsCollection = (callback: (projs: RealEstateProject[]) => void) => {
+  if (!isFirebaseEnabled()) return () => {};
+  try {
+    return onSnapshot(collection(db, 'projects'), (snapshot) => {
+      if (!snapshot.empty) {
+        const projs = snapshot.docs.map(d => d.data() as RealEstateProject);
+        callback(projs);
+      }
+    }, (err) => {
+      console.warn('Real-time projects subscription error:', err);
+    });
+  } catch (err) {
+    console.warn('Failed to setup projects snapshot listener:', err);
+    return () => {};
+  }
+};
+
 export const saveTransactionToFirebase = async (tx: Transaction) => {
   if (!isFirebaseEnabled()) return;
   try {
