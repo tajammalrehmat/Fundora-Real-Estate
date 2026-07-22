@@ -546,8 +546,21 @@ export default function App() {
 
         if (users !== null && users.length > 0) {
           const cleanUsers = users.filter(u => u && u.email && u.email.trim().toLowerCase() !== 'no-reply@fundora.one');
-          setUsersListState(cleanUsers);
-          safeSetLocalStorage('inv_users', JSON.stringify(cleanUsers));
+          setUsersListState(prev => {
+            const merged = [...cleanUsers];
+            prev.forEach(localUser => {
+              if (!localUser || !localUser.email) return;
+              const cleanE = localUser.email.trim().toLowerCase();
+              if (cleanE === 'no-reply@fundora.one') return;
+              const exists = merged.some(u => u && u.email && u.email.trim().toLowerCase() === cleanE);
+              if (!exists) {
+                merged.push(localUser);
+                saveUserToFirebase(localUser);
+              }
+            });
+            safeSetLocalStorage('inv_users', JSON.stringify(merged));
+            return merged;
+          });
         }
         if (transactions !== null) setTransactionsList(transactions);
         if (investments !== null) setInvestmentsList(investments);
@@ -561,22 +574,25 @@ export default function App() {
         if (savedActiveUser) {
           try {
             const parsed = JSON.parse(savedActiveUser);
-            const freshUser = users ? users.find(u => u.id === parsed.id || u.email.toLowerCase() === parsed.email.toLowerCase()) : null;
-            if (freshUser) {
-              setActiveUser(freshUser);
-              const isLocalActive = localStorage.getItem(`inv_device_biometric_active_${freshUser.email.toLowerCase().trim()}`) === 'true';
-              if (freshUser.webAuthnEnabled && isAppLockedRef.current && isLocalActive) {
-                setIsAppLocked(true);
+            if (parsed && parsed.email) {
+              const freshUser = users ? users.find(u => u.id === parsed.id || u.email.toLowerCase().trim() === parsed.email.toLowerCase().trim()) : null;
+              if (freshUser) {
+                setActiveUser(freshUser);
+                const isLocalActive = localStorage.getItem(`inv_device_biometric_active_${freshUser.email.toLowerCase().trim()}`) === 'true';
+                if (freshUser.webAuthnEnabled && isAppLockedRef.current && isLocalActive) {
+                  setIsAppLocked(true);
+                } else {
+                  setIsAppLocked(false);
+                }
               } else {
-                setIsAppLocked(false);
-              }
-            } else {
-              setActiveUser(parsed);
-              const isLocalActive = localStorage.getItem(`inv_device_biometric_active_${parsed.email.toLowerCase().trim()}`) === 'true';
-              if (parsed.webAuthnEnabled && isAppLockedRef.current && isLocalActive) {
-                setIsAppLocked(true);
-              } else {
-                setIsAppLocked(false);
+                setActiveUser(parsed);
+                saveUserToFirebase(parsed);
+                const isLocalActive = localStorage.getItem(`inv_device_biometric_active_${parsed.email.toLowerCase().trim()}`) === 'true';
+                if (parsed.webAuthnEnabled && isAppLockedRef.current && isLocalActive) {
+                  setIsAppLocked(true);
+                } else {
+                  setIsAppLocked(false);
+                }
               }
             }
           } catch (_) {
@@ -601,8 +617,21 @@ export default function App() {
     const unsubscribe = subscribeToUsersCollection((liveUsers) => {
       if (liveUsers && liveUsers.length > 0) {
         const cleanUsers = liveUsers.filter(u => u && u.email && u.email.trim().toLowerCase() !== 'no-reply@fundora.one');
-        setUsersListState(cleanUsers);
-        safeSetLocalStorage('inv_users', JSON.stringify(cleanUsers));
+        setUsersListState(prev => {
+          const merged = [...cleanUsers];
+          prev.forEach(localUser => {
+            if (!localUser || !localUser.email) return;
+            const cleanE = localUser.email.trim().toLowerCase();
+            if (cleanE === 'no-reply@fundora.one') return;
+            const exists = merged.some(u => u && u.email && u.email.trim().toLowerCase() === cleanE);
+            if (!exists) {
+              merged.push(localUser);
+              saveUserToFirebase(localUser);
+            }
+          });
+          safeSetLocalStorage('inv_users', JSON.stringify(merged));
+          return merged;
+        });
       }
     });
     return () => unsubscribe();

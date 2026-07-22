@@ -689,6 +689,7 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
           if (onRegisterPending) {
             onRegisterPending(updatedPendingUser);
           }
+          await saveUserToFirebase(updatedPendingUser);
 
           if (res.success) {
             setSuccessMsg(`Your registration is already in progress. A new verification OTP code has been sent to ${cleanEmail}.`);
@@ -762,6 +763,7 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
       if (onRegisterPending) {
         onRegisterPending(pendingUser);
       }
+      await saveUserToFirebase(pendingUser);
 
       if (res.success) {
         setSuccessMsg(`A verification code was sent to ${cleanEmail} via fundora.one.`);
@@ -781,7 +783,7 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
   };
 
   // Handle Verify Code
-  const handleVerify = (e: React.FormEvent) => {
+  const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!verificationCode) {
       setErrorMsg('Please enter the 6-digit confirmation code.');
@@ -794,11 +796,11 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
       return;
     }
 
-    const pendingUser = usersList.find(u => u.email.trim().toLowerCase() === (mockVerificationSentTo || email).trim().toLowerCase());
+    const pendingUser = usersList.find(u => u && u.email && u.email.trim().toLowerCase() === (mockVerificationSentTo || email).trim().toLowerCase());
 
     const newUser: UserAccount = {
       id: pendingUser ? pendingUser.id : `user-${Date.now()}`,
-      email: mockVerificationSentTo || email || 'saved_investor@gmail.com',
+      email: (mockVerificationSentTo || email || 'saved_investor@gmail.com').trim().toLowerCase(),
       name: fullName || (pendingUser ? pendingUser.name : 'New Secure Investor'),
       role: 'user',
       password: pendingUser ? pendingUser.password : password,
@@ -819,7 +821,12 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
     };
 
     addSystemLog('Wallet_Verification', `Email address ${newUser.email} verified successfully.`, 'Secure');
-    saveUserToFirebase(newUser);
+    try {
+      await saveUserToFirebase(newUser);
+      console.log("[Verify] Saved verified user to Firestore successfully:", newUser.email);
+    } catch (err) {
+      console.error("[Verify] Failed to save verified user to Firestore:", err);
+    }
     onAuthSuccess(newUser);
   };
 
