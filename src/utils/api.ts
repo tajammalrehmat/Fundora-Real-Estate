@@ -25,9 +25,9 @@ export const getApiUrl = (path: string): string => {
     } catch (_) {}
   }
 
-  // Define fallback URLs for Dev and Pre/Prod
+  // Define fallback URLs for Dev and Pre/Prod backends (Cloud Run containers)
   const devUrl = 'https://ais-dev-hb5de275kkaohqffdp2qfz-614235734610.asia-southeast1.run.app';
-  const preUrl = 'https://fundora.one';
+  const preUrl = 'https://ais-pre-hb5de275kkaohqffdp2qfz-614235734610.asia-southeast1.run.app';
   const isDev = import.meta.env.DEV || import.meta.env.MODE === 'development';
   const defaultBaseUrl = isDev ? devUrl : preUrl;
 

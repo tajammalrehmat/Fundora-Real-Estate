@@ -730,6 +730,34 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
     setMockVerificationSentTo(cleanEmail);
     setIsSendingOtp(true);
 
+    // Construct pendingUser FIRST so data is never lost even if OTP email service throws an error
+    const pendingUser: UserAccount = {
+      id: `user-${Date.now()}`,
+      email: cleanEmail,
+      name: fullName,
+      role: 'user',
+      password: password,
+      referralCode: `INV-${Math.floor(1000 + Math.random() * 9000)}`,
+      referredBy: referrer,
+      wallet: {
+        usdtTrc20Address: '',
+        usdtBep20Address: '',
+        isVerified: false
+      },
+      balance: 0,
+      totalDeposited: 0,
+      totalWithdrawn: 0,
+      totalInvestment: 0,
+      totalProfitEarned: 0,
+      isEmailVerified: false,
+      registrationDate: new Date().toISOString().slice(0, 10)
+    };
+
+    if (onRegisterPending) {
+      onRegisterPending(pendingUser);
+    }
+    await saveUserToFirebase(pendingUser);
+
     try {
       const res = await sendOtpEmail({
         toEmail: cleanEmail,
@@ -737,33 +765,6 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
         otpCode: code
       });
       setIsSendingOtp(false);
-      
-      const pendingUser: UserAccount = {
-        id: `user-${Date.now()}`,
-        email: cleanEmail,
-        name: fullName,
-        role: 'user',
-        password: password,
-        referralCode: `INV-${Math.floor(1000 + Math.random() * 9000)}`,
-        referredBy: referrer,
-        wallet: {
-          usdtTrc20Address: '',
-          usdtBep20Address: '',
-          isVerified: false
-        },
-        balance: 0,
-        totalDeposited: 0,
-        totalWithdrawn: 0,
-        totalInvestment: 0,
-        totalProfitEarned: 0,
-        isEmailVerified: false,
-        registrationDate: new Date().toISOString().slice(0, 10)
-      };
-
-      if (onRegisterPending) {
-        onRegisterPending(pendingUser);
-      }
-      await saveUserToFirebase(pendingUser);
 
       if (res.success) {
         setSuccessMsg(`A verification code was sent to ${cleanEmail} via fundora.one.`);
@@ -796,17 +797,31 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
       return;
     }
 
-    const pendingUser = usersList.find(u => u && u.email && u.email.trim().toLowerCase() === (mockVerificationSentTo || email).trim().toLowerCase());
+    const targetEmail = (mockVerificationSentTo || email).trim().toLowerCase();
+    let pendingUser = usersList.find(u => u && u.email && u.email.trim().toLowerCase() === targetEmail);
+
+    // If not found in local usersList state, query Firestore live as fail-safe
+    if (!pendingUser && isFirebaseEnabled()) {
+      try {
+        const q = query(collection(db, 'users'), where('email', '==', targetEmail));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          pendingUser = snap.docs[0].data() as UserAccount;
+        }
+      } catch (err) {
+        console.warn("[Verify] Could not query pending user in Firestore:", err);
+      }
+    }
 
     const newUser: UserAccount = {
       id: pendingUser ? pendingUser.id : `user-${Date.now()}`,
-      email: (mockVerificationSentTo || email || 'saved_investor@gmail.com').trim().toLowerCase(),
-      name: fullName || (pendingUser ? pendingUser.name : 'New Secure Investor'),
+      email: targetEmail || 'saved_investor@gmail.com',
+      name: (pendingUser && pendingUser.name) ? pendingUser.name : (fullName || 'New Secure Investor'),
       role: 'user',
-      password: pendingUser ? pendingUser.password : password,
-      referralCode: pendingUser ? pendingUser.referralCode : `INV-${Math.floor(1000 + Math.random() * 9000)}`,
-      referredBy: pendingUser ? pendingUser.referredBy : enteredReferrer,
-      wallet: pendingUser ? pendingUser.wallet : {
+      password: (pendingUser && pendingUser.password) ? pendingUser.password : password,
+      referralCode: (pendingUser && pendingUser.referralCode) ? pendingUser.referralCode : `INV-${Math.floor(1000 + Math.random() * 9000)}`,
+      referredBy: (pendingUser && pendingUser.referredBy) ? pendingUser.referredBy : enteredReferrer,
+      wallet: (pendingUser && pendingUser.wallet) ? pendingUser.wallet : {
         usdtTrc20Address: '',
         usdtBep20Address: '',
         isVerified: false
