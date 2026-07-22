@@ -3,6 +3,12 @@
 	"appName": "Fundora",
 	"webDir": "dist",
 	"server": {
+		"allowNavigation": [
+			"*",
+			"fundora.one",
+			"*.fundora.one",
+			"*.run.app"
+		],
 		"androidScheme": "https",
 		"cleartext": true
 	},
