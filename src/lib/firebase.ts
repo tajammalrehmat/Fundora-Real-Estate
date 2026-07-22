@@ -47,6 +47,7 @@ try {
   app = getApps().length > 0 ? getApps()[0] : initializeApp(firebaseConfig);
   try {
     db = initializeFirestore(app, {
+      experimentalAutoDetectLongPolling: true,
       experimentalForceLongPolling: true
     }, FIREBASE_DATABASE_ID);
     console.log(`[Firebase] Firestore auto-linked successfully to database ID: ${FIREBASE_DATABASE_ID}`);

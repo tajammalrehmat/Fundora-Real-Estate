@@ -84,7 +84,9 @@ export default function App() {
   const [usersListState, setUsersListState] = useState<UserAccount[]>(() => {
     const saved = localStorage.getItem('inv_users');
     const list: UserAccount[] = saved ? JSON.parse(saved) : [INITIAL_USER, INITIAL_ADMIN];
-    return list.map(u => u.id === 'user-admin' && (u.email === 'admin@fundora.one' || u.email === 'no-reply@fundora.one') ? { ...u, email: 'fundora.one@gmail.com' } : u);
+    return list
+      .map(u => u.id === 'user-admin' && (u.email === 'admin@fundora.one' || u.email === 'no-reply@fundora.one') ? { ...u, email: 'fundora.one@gmail.com' } : u)
+      .filter(u => u && u.email && u.email.trim().toLowerCase() !== 'no-reply@fundora.one');
   });
 
   const [activeUser, setActiveUser] = useState<UserAccount | null>(() => {
@@ -543,21 +545,9 @@ export default function App() {
         }
 
         if (users !== null && users.length > 0) {
-          setUsersListState(prev => {
-            const merged = [...prev];
-            users.forEach(fbUser => {
-              if (!fbUser || !fbUser.email) return;
-              const fbEmailClean = fbUser.email.trim().toLowerCase();
-              const idx = merged.findIndex(u => u && u.email && u.email.trim().toLowerCase() === fbEmailClean);
-              if (idx > -1) {
-                // Merge database record over local copy, prioritizing cloud details
-                merged[idx] = { ...merged[idx], ...fbUser, email: fbUser.email.trim() };
-              } else {
-                merged.push({ ...fbUser, email: fbUser.email.trim() });
-              }
-            });
-            return merged;
-          });
+          const cleanUsers = users.filter(u => u && u.email && u.email.trim().toLowerCase() !== 'no-reply@fundora.one');
+          setUsersListState(cleanUsers);
+          safeSetLocalStorage('inv_users', JSON.stringify(cleanUsers));
         }
         if (transactions !== null) setTransactionsList(transactions);
         if (investments !== null) setInvestmentsList(investments);
@@ -610,8 +600,9 @@ export default function App() {
     if (!isFirebaseEnabled()) return;
     const unsubscribe = subscribeToUsersCollection((liveUsers) => {
       if (liveUsers && liveUsers.length > 0) {
-        setUsersListState(liveUsers);
-        safeSetLocalStorage('inv_users', JSON.stringify(liveUsers));
+        const cleanUsers = liveUsers.filter(u => u && u.email && u.email.trim().toLowerCase() !== 'no-reply@fundora.one');
+        setUsersListState(cleanUsers);
+        safeSetLocalStorage('inv_users', JSON.stringify(cleanUsers));
       }
     });
     return () => unsubscribe();
