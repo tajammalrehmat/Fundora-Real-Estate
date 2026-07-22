@@ -1,3 +1,4 @@
+// Fundora Web-to-APK Configuration - Live Server Webview Wrapper
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
