@@ -9,7 +9,7 @@ import { UserAccount } from '../types';
 import { ShieldAlert, Mail, Lock, User, Key, UserCheck, AlertTriangle, Sparkles, Shield, Loader2, Fingerprint } from 'lucide-react';
 import { sendOtpEmail, isEmailServiceConfigured } from '../lib/emailService';
 import { db } from '../lib/firebase';
-import { isFirebaseEnabled } from '../lib/firebaseSync';
+import { isFirebaseEnabled, saveUserToFirebase } from '../lib/firebaseSync';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 
 const isProductionOrNative = (): boolean => {
@@ -567,16 +567,17 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
       const isPasswordCorrect = (matchedUser.password && matchedUser.password.trim() === password.trim()) || expectedPassword === password.trim() || (isAdminEmail && (password.trim() === 'Abbottabad@123' || password.trim() === 'admin123'));
 
       if (!isPasswordCorrect) {
-        setErrorMsg('Invalid email or secret password. Please try again.');
+        setErrorMsg('Incorrect password for this account. If you forgot your password, please click "Forgot Password?" below to reset it.');
         addSystemLog('Login_Failure', `Failed authorization attempt for ${cleanEmail} (incorrect password)`, 'Alarm');
         return;
       }
       addSystemLog('Login_Success', `Successful login verified for ${matchedUser.email}`, 'Secure');
+      saveUserToFirebase({ ...matchedUser });
       onAuthSuccess({ ...matchedUser });
     } else if (cleanEmail === 'fundora.one@gmail.com' || cleanEmail === 'no-reply@fundora.one') {
       // Emergency Admin access
-      if (password !== 'Abbottabad@123' && password !== 'admin123') {
-        setErrorMsg('Invalid email or secret password. Please try again.');
+      if (password.trim() !== 'Abbottabad@123' && password.trim() !== 'admin123') {
+        setErrorMsg('Incorrect admin password. Please check your credentials.');
         addSystemLog('Login_Failure', `Failed emergency admin authorization (incorrect password)`, 'Alarm');
         return;
       }
@@ -596,11 +597,11 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
         registrationDate: '2026-01-01'
       };
       addSystemLog('Admin_Action', `Admin authentication approved`, 'Secure');
+      saveUserToFirebase(adminAcc);
       onAuthSuccess(adminAcc);
     } else {
-      // Simulate account auto-creation or error
-      addSystemLog('Login_Failure', `Failed authorization attempt for ${cleanEmail}`, 'Alarm');
-      setErrorMsg('Invalid email or password. Feel free to register a new account instantly below.');
+      addSystemLog('Login_Failure', `Failed authorization attempt for ${cleanEmail} (no account found)`, 'Alarm');
+      setErrorMsg(`No registered account was found for email address "${cleanEmail}". Please register a new account below.`);
     }
   };
 
@@ -793,6 +794,7 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
     };
 
     addSystemLog('Wallet_Verification', `Email address ${newUser.email} verified successfully.`, 'Secure');
+    saveUserToFirebase(newUser);
     onAuthSuccess(newUser);
   };
 
