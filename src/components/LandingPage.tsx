@@ -955,22 +955,7 @@ export default function LandingPage({
           </div>
         </div>
       )}
-<div
-  style={{
-    position: "fixed",
-    top: 0,
-    left: 0,
-    right: 0,
-    background: "red",
-    color: "white",
-    padding: "6px",
-    textAlign: "center",
-    zIndex: 99999,
-    fontWeight: "bold"
-  }}
->
-TEST BUILD 23-Jul-2026 21:30
-</div>
+
       {/* Footer copyright */}
       <footer className="bg-slate-950 pt-6 pb-28 md:py-6 px-4 border-t border-slate-900 text-center text-[10px] text-slate-500 font-mono tracking-wide">
         <div className="mb-3 flex justify-center gap-4 text-[11px] text-emerald-450 font-sans font-bold">

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { db, auth, FIREBASE_DATABASE_ID, firebaseConfig } from './firebase';
+import { app, db, auth, FIREBASE_DATABASE_ID, firebaseConfig } from './firebase';
 import { 
   collection, 
   doc, 
@@ -291,41 +291,71 @@ export const saveUserToFirebase = async (user: UserAccount) => {
   );
   const tag = isAndroid ? '[ANDROID APK - FIRESTORE WRITE]' : '[WEB - FIRESTORE WRITE]';
 
+  console.log(`${tag} [ENTER saveUserToFirebase] Input user:`, {
+    userObject: user,
+    userId: user?.id,
+    userEmail: user?.email,
+    isFirebaseEnabled: isFirebaseEnabled(),
+    dbInstance: !!db,
+    appInstance: !!app,
+    authInstance: !!auth
+  });
+
   if (!isFirebaseEnabled()) {
-    console.warn(`${tag} saveUserToFirebase SKIPPED: Firebase is NOT enabled or db instance is missing.`);
-    return;
-  }
-  if (!user || !user.id) {
-    console.warn(`${tag} saveUserToFirebase SKIPPED: Invalid user object or missing user.id:`, user);
+    console.warn(`${tag} [EARLY RETURN] Reason: isFirebaseEnabled() returned false. db instance is falsy or uninitialized. db:`, db);
     return;
   }
 
+  if (!user) {
+    console.warn(`${tag} [EARLY RETURN] Reason: user argument passed to saveUserToFirebase is null or undefined.`);
+    return;
+  }
+
+  if (!user.id) {
+    console.warn(`${tag} [EARLY RETURN] Reason: user.id is missing or empty on the user object passed:`, user);
+    return;
+  }
+
+  const cleanEmail = user.email ? user.email.trim().toLowerCase() : '';
+  const cleanUser: UserAccount = {
+    ...user,
+    email: cleanEmail,
+    password: user.password ? user.password.trim() : user.password,
+    name: user.name ? user.name.trim() : user.name
+  };
+
+  console.log(`${tag} [BEFORE setDoc] Preparing setDoc for doc path "users/${cleanUser.id}":`, {
+    cleanUserId: cleanUser.id,
+    cleanUserEmail: cleanUser.email,
+    isFirebaseEnabled: isFirebaseEnabled(),
+    db: db,
+    app: app,
+    auth: auth,
+    cleanUserPayload: cleanUser
+  });
+
   const startTime = Date.now();
   try {
-    const cleanEmail = user.email ? user.email.trim().toLowerCase() : '';
-    const cleanUser: UserAccount = {
-      ...user,
-      email: cleanEmail,
-      password: user.password ? user.password.trim() : user.password,
-      name: user.name ? user.name.trim() : user.name
-    };
     const userDocRef = doc(db, 'users', cleanUser.id);
-    console.log(`${tag} EXECUTING setDoc on users collection... Doc ID: "${cleanUser.id}", Email: "${cleanUser.email}", Role: "${cleanUser.role}"`);
+    console.log(`${tag} [EXECUTING setDoc] Invoking setDoc(doc(db, "users", "${cleanUser.id}"), cleanUser)...`);
     
     logFirestoreOp('WRITE', 'users', cleanUser.id, { email: cleanUser.email, role: cleanUser.role });
     
     await setDoc(userDocRef, cleanUser);
     
     const duration = Date.now() - startTime;
-    console.log(`${tag} SUCCESS: Document setDoc resolved in ${duration}ms for User ID: "${cleanUser.id}" (Email: "${cleanUser.email}")`);
+    console.log(`${tag} [AFTER SUCCESSFUL setDoc] Document setDoc resolved successfully in ${duration}ms for cleanUser.id: "${cleanUser.id}", cleanUser.email: "${cleanUser.email}".`);
   } catch (e: any) {
     const duration = Date.now() - startTime;
-    console.error(`${tag} ERROR: setDoc FAILED or REJECTED after ${duration}ms:`, {
-      message: e?.message || e,
-      code: e?.code,
-      stack: e?.stack,
-      user: user
+    console.error(`${tag} [EXCEPTION IN setDoc] setDoc threw or rejected after ${duration}ms:`, {
+      code: e?.code || 'NO_CODE',
+      message: e?.message || String(e),
+      stack: e?.stack || 'NO_STACK',
+      fullErrorObj: e,
+      cleanUserId: cleanUser.id,
+      cleanUserEmail: cleanUser.email
     });
+    throw e;
   }
 };
 

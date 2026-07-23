@@ -131,7 +131,7 @@ export default function App() {
       return false;
     }
   });
-  
+
   // Robust URL Hash Routing Sync using Refs to prevent infinite loop / flickering
   const activeUserRef = useRef(activeUser);
   const isAppLockedRef = useRef(isAppLocked);
