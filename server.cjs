@@ -226,7 +226,7 @@ If you didn't request this verification, simply ignore this email.
           cleanBase64 = parts[1];
         }
       }
-      console.log(`[Receipt Analyzer] Triggering Gemini 3.5 Flash for receipt parsing, size: ~${Math.round(cleanBase64.length / 1024)} KB, mime: ${detectedMimeType}...`);
+      console.log(`[Receipt Analyzer] Triggering Gemini 3.6 Flash for receipt parsing, size: ~${Math.round(cleanBase64.length / 1024)} KB, mime: ${detectedMimeType}...`);
       const imagePart = {
         inlineData: {
           mimeType: detectedMimeType,
@@ -234,12 +234,12 @@ If you didn't request this verification, simply ignore this email.
         }
       };
       const promptPart = {
-        text: "You are an expert AI payment auditor. Carefully analyze this receipt, invoice, or screenshot of a cryptocurrency transaction (USDT) from ANY crypto wallet or exchange (such as Binance, OKX, Bybit, Trust Wallet, MetaMask, KuCoin, HTX, Bitget, Coinbase, Gate.io, etc.).\n\nIdentify and extract the following fields precisely:\n1. 'txid': The transaction hash, transaction ID, or reference code (usually a long alphanumeric/hexadecimal string like 'TX...' or '0x...'). Search for terms like TxID, TxHash, Hash, Transaction ID, Transaction Hash, Txn Hash, Ref No, Reference Number, ID, Order ID, internal ID, system reference. Do NOT include labels or words like 'TxID' or 'Transaction ID' inside the string, just the clean raw hash itself. If you cannot find a transaction hash/ID in the screenshot, search for any long alphanumeric string that resembles a transaction code/reference ID.\n2. 'amount': The exact transfer or deposit amount of USDT parsed as a number. Look for terms like Amount, Net Amount, Transferred, Sent, Quantity, Total, Value, Sum, Withdrawal Amount, Volume, Payment. Look for numbers directly followed by or near 'USDT', 'USD', 'Tether', or '$'. Only return the pure number (e.g. if the screenshot shows '150 USDT' or '$150.00', extract 150). Ignore any commas or currency labels.\n3. 'network': The matching blockchain transfer network. Look for signs of 'TRC20', 'TRX', 'Tron', 'BEP20', 'BSC', 'BNB Smart Chain', 'BSC (BEP20)'. Return either 'TRC20' or 'BEP20'. If not clearly mentioned, default to 'TRC20' if the transaction ID or destination address starts with 'T', or 'BEP20' if it starts with '0x'. If no network is found, default to 'TRC20'.\n\nFormat the output STRICTLY as JSON matching the schema. Do not fail under any circumstances. If some fields are missing, extract the most plausible candidates."
+        text: "You are an expert AI payment auditor. Carefully analyze this image of a cryptocurrency payment receipt, deposit confirmation, transfer invoice, or order screenshot (e.g. Quotex, Binance, OKX, Bybit, Trust Wallet, MetaMask, Bitnbox, KuCoin, etc.).\n\nIdentify and extract these EXACT fields:\n1. 'amount': The exact numerical transfer, deposit, or payment amount in USDT or USD. Look for labels like 'Total amount', 'Amount', 'Net Amount', 'Transferred', 'Paid', 'Payment', 'Total', 'Sum', 'Value'. Look at all numbers near 'USDT', 'USD', '$', or payment amount labels. For example, if the screenshot shows '12 USDT' or 'Total amount 12 USDT', return 12. Only return the clean pure number as a float/integer, without currency symbols or text.\n2. 'txid': The transaction hash, transaction ID, Order ID, Deposit ID, Ref No, or Reference Code (e.g., '124119776', 'TX...', '0x...'). Look for labels like 'Order ID', 'Deposit ID', 'TxID', 'TxHash', 'Transaction ID', 'Ref No', 'Reference Number', 'Hash', 'ID'. Extract the clean string without prefixes or labels.\n3. 'network': The matching transfer network (e.g. 'TRC20', 'BEP20', 'BSC', 'TRX'). Default to 'TRC20' if not specified.\n\nFormat the output STRICTLY as JSON matching the schema."
       };
       let response;
       try {
         response = await ai.models.generateContent({
-          model: "gemini-2.5-flash",
+          model: "gemini-3.6-flash",
           contents: { parts: [imagePart, promptPart] },
           config: {
             responseMimeType: "application/json",
@@ -248,11 +248,11 @@ If you didn't request this verification, simply ignore this email.
               properties: {
                 txid: {
                   type: import_genai.Type.STRING,
-                  description: "The transaction hash, ID or TxID from the screenshot."
+                  description: "The transaction hash, Order ID, Deposit ID, or TxID from the screenshot."
                 },
                 amount: {
                   type: import_genai.Type.NUMBER,
-                  description: "The transfer amount parsed as a number."
+                  description: "The transfer/payment amount parsed strictly as a number."
                 },
                 network: {
                   type: import_genai.Type.STRING,
@@ -264,9 +264,9 @@ If you didn't request this verification, simply ignore this email.
           }
         });
       } catch (primaryErr) {
-        console.warn("[Receipt Analyzer] gemini-2.5-flash call failed, trying gemini-1.5-flash fallback:", primaryErr?.message || primaryErr);
+        console.warn("[Receipt Analyzer] gemini-3.6-flash call failed, trying gemini-3.1-pro-preview fallback:", primaryErr?.message || primaryErr);
         response = await ai.models.generateContent({
-          model: "gemini-1.5-flash",
+          model: "gemini-3.1-pro-preview",
           contents: { parts: [imagePart, promptPart] },
           config: {
             responseMimeType: "application/json",
@@ -275,11 +275,11 @@ If you didn't request this verification, simply ignore this email.
               properties: {
                 txid: {
                   type: import_genai.Type.STRING,
-                  description: "The transaction hash, ID or TxID from the screenshot."
+                  description: "The transaction hash, Order ID, Deposit ID, or TxID from the screenshot."
                 },
                 amount: {
                   type: import_genai.Type.NUMBER,
-                  description: "The transfer amount parsed as a number."
+                  description: "The transfer/payment amount parsed strictly as a number."
                 },
                 network: {
                   type: import_genai.Type.STRING,
