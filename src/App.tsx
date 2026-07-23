@@ -131,23 +131,7 @@ export default function App() {
       return false;
     }
   });
-  <div
-  style={{
-    position: "fixed",
-    top: 0,
-    left: 0,
-    right: 0,
-    background: "red",
-    color: "white",
-    padding: "6px",
-    textAlign: "center",
-    zIndex: 99999,
-    fontWeight: "bold"
-  }}
->
-TEST BUILD 23-Jul-2026 21:30
-</div>
-
+  
   // Robust URL Hash Routing Sync using Refs to prevent infinite loop / flickering
   const activeUserRef = useRef(activeUser);
   const isAppLockedRef = useRef(isAppLocked);
