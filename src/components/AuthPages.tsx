@@ -752,7 +752,7 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
       role: 'user',
       password: password,
       referralCode: `INV-${Math.floor(1000 + Math.random() * 9000)}`,
-      referredBy: referrer,
+      referredBy: referrer || '',
       wallet: {
         usdtTrc20Address: '',
         usdtBep20Address: '',
@@ -873,7 +873,7 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
       role: 'user',
       password: (pendingUser && pendingUser.password) ? pendingUser.password : password,
       referralCode: (pendingUser && pendingUser.referralCode) ? pendingUser.referralCode : `INV-${Math.floor(1000 + Math.random() * 9000)}`,
-      referredBy: (pendingUser && pendingUser.referredBy) ? pendingUser.referredBy : enteredReferrer,
+      referredBy: (pendingUser && pendingUser.referredBy) ? pendingUser.referredBy : (enteredReferrer || ''),
       wallet: (pendingUser && pendingUser.wallet) ? pendingUser.wallet : {
         usdtTrc20Address: '',
         usdtBep20Address: '',

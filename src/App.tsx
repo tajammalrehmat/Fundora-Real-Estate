@@ -555,9 +555,18 @@ export default function App() {
                   setIsAppLocked(false);
                 }
               } else {
-                // If user no longer exists in DB, log out
-                setActiveUser(null);
-                localStorage.removeItem('inv_active_user');
+                // Local activeUser found in localStorage but not yet in Firestore DB.
+                // Auto-sync this account to Firestore DB so it's safely saved in cloud
+                console.log(`[Sync] Local activeUser ${parsed.email} not in Firestore DB yet. Auto-persisting to Firestore...`);
+                setActiveUser(parsed);
+                setIsAppLocked(false);
+                saveAndSyncUser(parsed);
+                // Also add to local usersListState so it shows up in users collection
+                setUsersListState(prev => {
+                  const exists = prev.some(u => u.email.trim().toLowerCase() === parsed.email.trim().toLowerCase());
+                  if (exists) return prev;
+                  return [...prev, parsed];
+                });
               }
             }
           } catch (_) {

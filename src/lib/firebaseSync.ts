@@ -24,6 +24,12 @@ export const logFirestoreOp = (op: 'READ' | 'WRITE' | 'DELETE' | 'LISTEN', colle
     extra !== undefined ? extra : ''
   );
 };
+
+// Helper to sanitize payload and remove any undefined fields that cause Firestore setDoc/updateDoc to reject
+export const cleanPayloadForFirestore = <T>(data: T): T => {
+  if (data === null || data === undefined) return data;
+  return JSON.parse(JSON.stringify(data));
+};
 import { 
   INITIAL_PROJECTS, 
   INITIAL_USER, 
@@ -272,10 +278,11 @@ export const loadSecurityLogsFromFirebase = async (): Promise<SecurityLog[] | nu
 
 // Write helpers for real-time synchronization
 export const saveProjectToFirebase = async (proj: RealEstateProject) => {
-  if (!isFirebaseEnabled()) return;
+  if (!isFirebaseEnabled() || !proj || !proj.id) return;
   try {
-    logFirestoreOp('WRITE', 'projects', proj.id, { name: proj.name });
-    await setDoc(doc(db, 'projects', proj.id), proj);
+    const cleanProj = cleanPayloadForFirestore(proj);
+    logFirestoreOp('WRITE', 'projects', cleanProj.id, { name: cleanProj.name });
+    await setDoc(doc(db, 'projects', cleanProj.id), cleanProj);
   } catch (e) {
     console.error('Failed to save project to Firebase:', e);
   }
@@ -317,12 +324,15 @@ export const saveUserToFirebase = async (user: UserAccount) => {
   }
 
   const cleanEmail = user.email ? user.email.trim().toLowerCase() : '';
-  const cleanUser: UserAccount = {
+  const rawUser: UserAccount = {
     ...user,
     email: cleanEmail,
-    password: user.password ? user.password.trim() : user.password,
-    name: user.name ? user.name.trim() : user.name
+    password: user.password ? user.password.trim() : (user.password || ''),
+    name: user.name ? user.name.trim() : (user.name || '')
   };
+
+  // Strip out any undefined properties that cause Firestore setDoc to reject with 'Unsupported field value: undefined'
+  const cleanUser: UserAccount = cleanPayloadForFirestore(rawUser);
 
   console.log(`${tag} [BEFORE setDoc] Preparing setDoc for doc path "users/${cleanUser.id}":`, {
     cleanUserId: cleanUser.id,
@@ -564,12 +574,13 @@ export const subscribeToSystemSettings = (callback: (settings: SystemSettings) =
 };
 
 export const saveTransactionToFirebase = async (tx: Transaction) => {
-  if (!isFirebaseEnabled()) return;
+  if (!isFirebaseEnabled() || !tx || !tx.id) return;
   try {
-    const cleanTx: Transaction = {
+    const rawTx: Transaction = {
       ...tx,
       userEmail: tx.userEmail ? tx.userEmail.trim().toLowerCase() : ''
     };
+    const cleanTx = cleanPayloadForFirestore(rawTx);
     logFirestoreOp('WRITE', 'transactions', cleanTx.id, { type: cleanTx.type, amount: cleanTx.amount, userEmail: cleanTx.userEmail });
     await setDoc(doc(db, 'transactions', cleanTx.id), cleanTx);
   } catch (e) {
@@ -578,12 +589,13 @@ export const saveTransactionToFirebase = async (tx: Transaction) => {
 };
 
 export const saveInvestmentToFirebase = async (inv: InvestmentRecord) => {
-  if (!isFirebaseEnabled()) return;
+  if (!isFirebaseEnabled() || !inv || !inv.id) return;
   try {
-    const cleanInv: InvestmentRecord = {
+    const rawInv: InvestmentRecord = {
       ...inv,
       userEmail: inv.userEmail ? inv.userEmail.trim().toLowerCase() : ''
     };
+    const cleanInv = cleanPayloadForFirestore(rawInv);
     logFirestoreOp('WRITE', 'investments', cleanInv.id, { projectName: cleanInv.projectName, shares: cleanInv.sharesPurchased });
     await setDoc(doc(db, 'investments', cleanInv.id), cleanInv);
   } catch (e) {
@@ -592,12 +604,13 @@ export const saveInvestmentToFirebase = async (inv: InvestmentRecord) => {
 };
 
 export const saveClaimToFirebase = async (claim: ProfitClaimRecord) => {
-  if (!isFirebaseEnabled()) return;
+  if (!isFirebaseEnabled() || !claim || !claim.id) return;
   try {
-    const cleanClaim: ProfitClaimRecord = {
+    const rawClaim: ProfitClaimRecord = {
       ...claim,
       userEmail: claim.userEmail ? claim.userEmail.trim().toLowerCase() : ''
     };
+    const cleanClaim = cleanPayloadForFirestore(rawClaim);
     logFirestoreOp('WRITE', 'claims', cleanClaim.id, { amount: cleanClaim.amount, status: cleanClaim.status });
     await setDoc(doc(db, 'claims', cleanClaim.id), cleanClaim);
   } catch (e) {
@@ -606,10 +619,11 @@ export const saveClaimToFirebase = async (claim: ProfitClaimRecord) => {
 };
 
 export const saveSecurityLogToFirebase = async (log: SecurityLog) => {
-  if (!isFirebaseEnabled()) return;
+  if (!isFirebaseEnabled() || !log || !log.id) return;
   try {
-    logFirestoreOp('WRITE', 'security_logs', log.id, { eventType: log.eventType, status: log.status });
-    await setDoc(doc(db, 'security_logs', log.id), log);
+    const cleanLog = cleanPayloadForFirestore(log);
+    logFirestoreOp('WRITE', 'security_logs', cleanLog.id, { eventType: cleanLog.eventType, status: cleanLog.status });
+    await setDoc(doc(db, 'security_logs', cleanLog.id), cleanLog);
   } catch (e) {
     console.error('Failed to save security log to Firebase:', e);
   }
@@ -659,12 +673,13 @@ export const loadSystemSettingsFromFirebase = async (): Promise<SystemSettings |
 };
 
 export const saveSystemSettingsToFirebase = async (settings: SystemSettings) => {
-  if (!isFirebaseEnabled()) return;
+  if (!isFirebaseEnabled() || !settings) return;
   try {
-    const cleanSettings = {
+    const rawSettings = {
       ...settings,
       apiUrl: (settings.apiUrl && !settings.apiUrl.includes('fundora.one')) ? settings.apiUrl : 'https://ais-pre-hb5de275kkaohqffdp2qfz-614235734610.asia-southeast1.run.app'
     };
+    const cleanSettings = cleanPayloadForFirestore(rawSettings);
     logFirestoreOp('WRITE', 'system_settings', 'default', cleanSettings);
     await setDoc(doc(db, 'system_settings', 'default'), cleanSettings);
   } catch (e) {
@@ -687,10 +702,11 @@ export const loadInquiriesFromFirebase = async (): Promise<Inquiry[] | null> => 
 };
 
 export const saveInquiryToFirebase = async (inquiry: Inquiry) => {
-  if (!isFirebaseEnabled()) return;
+  if (!isFirebaseEnabled() || !inquiry || !inquiry.id) return;
   try {
-    logFirestoreOp('WRITE', 'inquiries', inquiry.id, { name: inquiry.name, email: inquiry.email });
-    await setDoc(doc(db, 'inquiries', inquiry.id), inquiry);
+    const cleanInquiry = cleanPayloadForFirestore(inquiry);
+    logFirestoreOp('WRITE', 'inquiries', cleanInquiry.id, { name: cleanInquiry.name, email: cleanInquiry.email });
+    await setDoc(doc(db, 'inquiries', cleanInquiry.id), cleanInquiry);
   } catch (e) {
     console.error('Failed to save inquiry to Firebase:', e);
   }
