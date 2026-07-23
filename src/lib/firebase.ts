@@ -65,11 +65,11 @@ try {
 
   try {
     db = initializeFirestore(app, {
-      experimentalForceLongPolling: true
+      experimentalAutoDetectLongPolling: true
     }, FIREBASE_DATABASE_ID);
-    console.log(`${platformTag} initializeFirestore executed with experimentalForceLongPolling for database ID: "${FIREBASE_DATABASE_ID}". Firestore instance created:`, !!db);
+    console.log(`${platformTag} initializeFirestore executed with experimentalAutoDetectLongPolling for database ID: "${FIREBASE_DATABASE_ID}". Firestore instance created:`, !!db);
   } catch (err) {
-    console.warn(`${platformTag} initializeFirestore with force long polling failed, falling back to getFirestore:`, err);
+    console.warn(`${platformTag} initializeFirestore failed, falling back to getFirestore:`, err);
     db = getFirestore(app, FIREBASE_DATABASE_ID);
     console.log(`${platformTag} Fallback getFirestore executed. Firestore instance created:`, !!db);
   }
