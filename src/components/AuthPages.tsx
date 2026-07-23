@@ -530,10 +530,10 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
     // Find in the system usersList
     let matchedUser = usersList.find(u => u && u.email && u.email.trim().toLowerCase() === cleanEmail);
 
-    // If not found in local usersList state, query Firestore database live as a safeguard
-    if (!matchedUser && isFirebaseEnabled()) {
+    // Query Firestore database live to ensure fresh account data from cloud (APK and Web)
+    if (isFirebaseEnabled()) {
       try {
-        console.log(`[Login] User not found in local state. Querying Firestore live for ${cleanEmail}...`);
+        console.log(`[Login] Querying Firestore live for ${cleanEmail}...`);
         const q = query(collection(db, 'users'), where('email', '==', cleanEmail));
         const snap = await getDocs(q);
         if (!snap.empty) {
