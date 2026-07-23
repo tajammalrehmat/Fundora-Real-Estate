@@ -8,6 +8,7 @@ import { NativeBiometric } from 'capacitor-native-biometric';
 import { UserAccount } from '../types';
 import { ShieldAlert, Mail, Lock, User, Key, UserCheck, AlertTriangle, Sparkles, Shield, Loader2, Fingerprint } from 'lucide-react';
 import { sendOtpEmail, isEmailServiceConfigured } from '../lib/emailService';
+import { getApiUrl } from '../utils/api';
 import { db } from '../lib/firebase';
 import { isFirebaseEnabled, saveUserToFirebase } from '../lib/firebaseSync';
 import { collection, query, where, getDocs, getDoc, doc } from 'firebase/firestore';
@@ -732,6 +733,17 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
     setMockVerificationSentTo(cleanEmail);
     setIsSendingOtp(true);
 
+    const isAndroid = typeof window !== 'undefined' && (
+      /android/i.test(navigator.userAgent) || 
+      !!(window as any).Capacitor || 
+      window.location.origin.startsWith('file:') || 
+      window.location.origin.startsWith('capacitor:') || 
+      window.location.origin.startsWith('app:')
+    );
+    const tag = isAndroid ? '[ANDROID APK - REGISTER]' : '[WEB - REGISTER]';
+
+    console.log(`${tag} Step 1: Starting registration form submit for email: "${cleanEmail}"...`);
+
     // Construct pendingUser FIRST so data is never lost even if OTP email service throws an error
     const pendingUser: UserAccount = {
       id: `user-${Date.now()}`,
@@ -755,12 +767,22 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
       registrationDate: new Date().toISOString().slice(0, 10)
     };
 
+    console.log(`${tag} Step 2: Generated pendingUser account:`, pendingUser);
     setPendingUserId(pendingUser.id);
     if (onRegisterPending) {
+      console.log(`${tag} Step 3: Triggering onRegisterPending handler...`);
       onRegisterPending(pendingUser);
     }
-    await saveUserToFirebase(pendingUser);
+    
+    console.log(`${tag} Step 4: Invoking saveUserToFirebase for pending user...`);
+    try {
+      await saveUserToFirebase(pendingUser);
+      console.log(`${tag} Step 4 SUCCESS: Pending user written to Firestore doc ID "${pendingUser.id}".`);
+    } catch (fsError: any) {
+      console.error(`${tag} Step 4 NON-BLOCKING ERROR: saveUserToFirebase threw exception for pending user:`, fsError);
+    }
 
+    console.log(`${tag} Step 5: Dispatching OTP email to "${cleanEmail}"... Target API URL: "${getApiUrl('/api/send-otp')}"`);
     try {
       const res = await sendOtpEmail({
         toEmail: cleanEmail,
@@ -770,18 +792,22 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
       setIsSendingOtp(false);
 
       if (res.success) {
+        console.log(`${tag} Step 5 SUCCESS: OTP email sent via server API.`);
         setSuccessMsg(`A verification code was sent to ${cleanEmail} via fundora.one.`);
       } else {
-        console.warn("Real-time email sending fallback triggered:", res.error);
+        console.warn(`${tag} Step 5 FALLBACK: Real-time email sending fallback triggered:`, res.error);
         setEmailSendError(res.error || "Failed to deliver OTP via real email.");
         setShowMockFallback(true);
       }
+      console.log(`${tag} Step 6: Transitioning UI screen to "verify"...`);
       setScreen('verify');
       addSystemLog('Register_Referral', `New registration initialized with email ${cleanEmail}. OTP ${code} dispatched. Referral code used: ${referrer || 'None'}`, 'Secure');
     } catch (err: any) {
+      console.error(`${tag} Step 5 EXCEPTION: sendOtpEmail threw exception:`, err);
       setIsSendingOtp(false);
       setEmailSendError(err.message || "Failed to contact proxy email service.");
       setShowMockFallback(true);
+      console.log(`${tag} Step 6 (Fallback): Transitioning UI screen to "verify"...`);
       setScreen('verify');
     }
   };
@@ -789,6 +815,17 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
   // Handle Verify Code
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
+    const isAndroid = typeof window !== 'undefined' && (
+      /android/i.test(navigator.userAgent) || 
+      !!(window as any).Capacitor || 
+      window.location.origin.startsWith('file:') || 
+      window.location.origin.startsWith('capacitor:') || 
+      window.location.origin.startsWith('app:')
+    );
+    const tag = isAndroid ? '[ANDROID APK - OTP VERIFY]' : '[WEB - OTP VERIFY]';
+
+    console.log(`${tag} Step 1: Submitting OTP verification code... Entered Code: "${verificationCode}", Generated Code: "${generatedOtp}"`);
+
     if (!verificationCode) {
       setErrorMsg('Please enter the 6-digit confirmation code.');
       return;
@@ -796,29 +833,34 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
 
     // Ensure entered OTP code is correct
     if (verificationCode.trim() !== generatedOtp) {
+      console.warn(`${tag} Step 1 FAILED: Mismatched OTP code.`);
       setErrorMsg('Invalid verification code. Please enter the correct 6-digit OTP code dispatched to your email.');
       return;
     }
 
+    console.log(`${tag} Step 2: OTP code match confirmed! Resolving target user email...`);
     const targetEmail = (mockVerificationSentTo || email).trim().toLowerCase();
     let pendingUser = usersList.find(u => u && u.email && u.email.trim().toLowerCase() === targetEmail);
 
     // If not found in local usersList state, query Firestore live as fail-safe
     if (!pendingUser && isFirebaseEnabled()) {
+      console.log(`${tag} Step 3: Pending user not found in local state. Querying Firestore for "${targetEmail}"...`);
       try {
         const q = query(collection(db, 'users'), where('email', '==', targetEmail));
         const snap = await getDocs(q);
         if (!snap.empty) {
           pendingUser = snap.docs[0].data() as UserAccount;
+          console.log(`${tag} Step 3 SUCCESS: Query returned pendingUser from Firestore:`, pendingUser.id);
         } else if (pendingUserId) {
-          // Scalable lookup strategy: O(1) document lookup by pendingUserId
+          console.log(`${tag} Step 3 ALT: Doc query by pendingUserId "${pendingUserId}"...`);
           const userDocSnap = await getDoc(doc(db, 'users', pendingUserId));
           if (userDocSnap.exists()) {
             pendingUser = userDocSnap.data() as UserAccount;
+            console.log(`${tag} Step 3 SUCCESS: Direct doc lookup found pendingUser:`, pendingUser.id);
           }
         }
       } catch (err) {
-        console.warn("[Verify] Could not query pending user in Firestore:", err);
+        console.warn(`${tag} Step 3 ERROR: Could not query pending user in Firestore:`, err);
       }
     }
 
@@ -846,13 +888,18 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
       registrationDate: pendingUser ? pendingUser.registrationDate : new Date().toISOString().slice(0, 10)
     };
 
+    console.log(`${tag} Step 4: Final verified UserAccount object constructed:`, newUser);
     addSystemLog('Wallet_Verification', `Email address ${newUser.email} verified successfully.`, 'Secure');
+
+    console.log(`${tag} Step 5: Saving verified user to Firestore... Doc ID: "${newUser.id}"`);
     try {
       await saveUserToFirebase(newUser);
-      console.log("[Verify] Saved verified user to Firestore successfully:", newUser.email);
+      console.log(`${tag} Step 5 SUCCESS: Verified user setDoc complete in Firestore for ${newUser.email}.`);
     } catch (err) {
-      console.error("[Verify] Failed to save verified user to Firestore:", err);
+      console.error(`${tag} Step 5 ERROR: Failed to save verified user to Firestore:`, err);
     }
+
+    console.log(`${tag} Step 6: Triggering onAuthSuccess callback and logging in user...`);
     onAuthSuccess(newUser);
   };
 

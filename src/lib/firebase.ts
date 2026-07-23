@@ -43,20 +43,40 @@ let app: any;
 let db: any;
 let auth: any;
 
+console.log("[DEBUG LOG - FIREBASE INIT] Starting Firebase initialization...");
+const isAndroidApp = typeof window !== 'undefined' && (
+  /android/i.test(navigator.userAgent) || 
+  !!(window as any).Capacitor || 
+  window.location.origin.startsWith('file:') || 
+  window.location.origin.startsWith('capacitor:') || 
+  window.location.origin.startsWith('app:') ||
+  (window.location.host && window.location.host.includes('localhost') && !(import.meta.env.DEV))
+);
+const platformTag = isAndroidApp ? '[ANDROID APK - FIREBASE INIT]' : '[WEB - FIREBASE INIT]';
+
+console.log(`${platformTag} Environment detected. Origin: ${typeof window !== 'undefined' ? window.location.origin : 'N/A'}, UserAgent: ${typeof navigator !== 'undefined' ? navigator.userAgent : 'N/A'}`);
+console.log(`${platformTag} Config ProjectID:`, firebaseConfig.projectId);
+console.log(`${platformTag} Config AppID:`, firebaseConfig.appId);
+console.log(`${platformTag} Target DatabaseID:`, FIREBASE_DATABASE_ID);
+
 try {
   app = getApps().length > 0 ? getApps()[0] : initializeApp(firebaseConfig);
+  console.log(`${platformTag} FirebaseApp initialized successfully. Existing apps count:`, getApps().length);
+
   try {
     db = initializeFirestore(app, {
-      experimentalAutoDetectLongPolling: true
+      experimentalForceLongPolling: true
     }, FIREBASE_DATABASE_ID);
-    console.log(`[Firebase] Firestore initialized with auto long-polling for database ID: ${FIREBASE_DATABASE_ID}`);
+    console.log(`${platformTag} initializeFirestore executed with experimentalForceLongPolling for database ID: "${FIREBASE_DATABASE_ID}". Firestore instance created:`, !!db);
   } catch (err) {
-    console.warn("[Firebase] initializeFirestore failed, falling back to getFirestore:", err);
+    console.warn(`${platformTag} initializeFirestore with force long polling failed, falling back to getFirestore:`, err);
     db = getFirestore(app, FIREBASE_DATABASE_ID);
+    console.log(`${platformTag} Fallback getFirestore executed. Firestore instance created:`, !!db);
   }
   auth = getAuth(app);
+  console.log(`${platformTag} FirebaseAuth initialized successfully.`);
 } catch (error) {
-  console.error("[Firebase] Initialization error:", error);
+  console.error(`${platformTag} Critical error during Firebase initialization:`, error);
 }
 
 export { app, db, auth };

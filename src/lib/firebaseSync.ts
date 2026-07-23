@@ -162,9 +162,23 @@ export const loadProjectsFromFirebase = async (): Promise<RealEstateProject[] | 
 };
 
 export const loadUsersFromFirebase = async (): Promise<UserAccount[] | null> => {
-  if (!isFirebaseEnabled()) return null;
+  const isAndroid = typeof window !== 'undefined' && (
+    /android/i.test(navigator.userAgent) || 
+    !!(window as any).Capacitor || 
+    window.location.origin.startsWith('file:') || 
+    window.location.origin.startsWith('capacitor:') || 
+    window.location.origin.startsWith('app:')
+  );
+  const tag = isAndroid ? '[ANDROID APK - FIRESTORE READ]' : '[WEB - FIRESTORE READ]';
+
+  if (!isFirebaseEnabled()) {
+    console.warn(`${tag} loadUsersFromFirebase SKIPPED: isFirebaseEnabled returned false`);
+    return null;
+  }
+  console.log(`${tag} Querying getDocs(collection(db, "users"))...`);
   try {
     const snapshot = await getDocs(collection(db, 'users'));
+    console.log(`${tag} SUCCESS: getDocs returned ${snapshot.size} documents in users collection.`);
     if (snapshot.empty) return [INITIAL_USER, INITIAL_ADMIN];
     const users = snapshot.docs.map(d => d.data() as UserAccount);
     
@@ -191,7 +205,7 @@ export const loadUsersFromFirebase = async (): Promise<UserAccount[] | null> => 
         try {
           await setDoc(doc(db, 'users', updatedUser.id), updatedUser);
         } catch (err) {
-          console.warn('Error updating cleaned user doc in Firestore:', err);
+          console.warn(`${tag} Error updating cleaned user doc in Firestore:`, err);
         }
       }
       if (updatedUser.email && updatedUser.email !== 'no-reply@fundora.one') {
@@ -199,9 +213,10 @@ export const loadUsersFromFirebase = async (): Promise<UserAccount[] | null> => 
       }
     }
 
+    console.log(`${tag} Cleaned users count: ${cleanedUsers.length}. Emails found:`, cleanedUsers.map(u => u.email));
     return cleanedUsers;
-  } catch (e) {
-    console.error('Error loading users from Firebase:', e);
+  } catch (e: any) {
+    console.error(`${tag} ERROR loading users from Firebase Firestore:`, e);
     return null;
   }
 };
@@ -267,7 +282,25 @@ export const saveProjectToFirebase = async (proj: RealEstateProject) => {
 };
 
 export const saveUserToFirebase = async (user: UserAccount) => {
-  if (!isFirebaseEnabled() || !user || !user.id) return;
+  const isAndroid = typeof window !== 'undefined' && (
+    /android/i.test(navigator.userAgent) || 
+    !!(window as any).Capacitor || 
+    window.location.origin.startsWith('file:') || 
+    window.location.origin.startsWith('capacitor:') || 
+    window.location.origin.startsWith('app:')
+  );
+  const tag = isAndroid ? '[ANDROID APK - FIRESTORE WRITE]' : '[WEB - FIRESTORE WRITE]';
+
+  if (!isFirebaseEnabled()) {
+    console.warn(`${tag} saveUserToFirebase SKIPPED: Firebase is NOT enabled or db instance is missing.`);
+    return;
+  }
+  if (!user || !user.id) {
+    console.warn(`${tag} saveUserToFirebase SKIPPED: Invalid user object or missing user.id:`, user);
+    return;
+  }
+
+  const startTime = Date.now();
   try {
     const cleanEmail = user.email ? user.email.trim().toLowerCase() : '';
     const cleanUser: UserAccount = {
@@ -276,10 +309,23 @@ export const saveUserToFirebase = async (user: UserAccount) => {
       password: user.password ? user.password.trim() : user.password,
       name: user.name ? user.name.trim() : user.name
     };
+    const userDocRef = doc(db, 'users', cleanUser.id);
+    console.log(`${tag} EXECUTING setDoc on users collection... Doc ID: "${cleanUser.id}", Email: "${cleanUser.email}", Role: "${cleanUser.role}"`);
+    
     logFirestoreOp('WRITE', 'users', cleanUser.id, { email: cleanUser.email, role: cleanUser.role });
-    await setDoc(doc(db, 'users', cleanUser.id), cleanUser);
-  } catch (e) {
-    console.error('Failed to save user to Firebase:', e);
+    
+    await setDoc(userDocRef, cleanUser);
+    
+    const duration = Date.now() - startTime;
+    console.log(`${tag} SUCCESS: Document setDoc resolved in ${duration}ms for User ID: "${cleanUser.id}" (Email: "${cleanUser.email}")`);
+  } catch (e: any) {
+    const duration = Date.now() - startTime;
+    console.error(`${tag} ERROR: setDoc FAILED or REJECTED after ${duration}ms:`, {
+      message: e?.message || e,
+      code: e?.code,
+      stack: e?.stack,
+      user: user
+    });
   }
 };
 
@@ -334,9 +380,14 @@ export const deleteSecurityLogFromFirebase = async (id: string) => {
 };
 
 export const subscribeToUsersCollection = (callback: (users: UserAccount[]) => void) => {
-  if (!isFirebaseEnabled()) return () => {};
+  if (!isFirebaseEnabled()) {
+    console.warn('[DEBUG LOG - USERS SUBSCRIPTION] isFirebaseEnabled returned false');
+    return () => {};
+  }
+  console.log('[DEBUG LOG - USERS SUBSCRIPTION START] Subscribing to "users" onSnapshot...');
   try {
     return onSnapshot(collection(db, 'users'), (snapshot) => {
+      console.log(`[DEBUG LOG - USERS SUBSCRIPTION SNAPSHOT] Document count: ${snapshot.size}, isFromCache: ${snapshot.metadata.hasPendingWrites}`);
       if (!snapshot.empty) {
         const users = snapshot.docs.map(d => {
           const u = d.data() as UserAccount;
@@ -351,15 +402,17 @@ export const subscribeToUsersCollection = (callback: (users: UserAccount[]) => v
             password: u.password ? u.password.trim() : u.password
           };
         }).filter(u => u && u.email && u.email.trim().toLowerCase() !== 'no-reply@fundora.one');
+        console.log('[DEBUG LOG - USERS SUBSCRIPTION SUCCESS] Loaded user emails:', users.map(u => u?.email));
         callback(users as UserAccount[]);
       } else {
+        console.log('[DEBUG LOG - USERS SUBSCRIPTION SNAPSHOT] Snapshot empty');
         callback([]);
       }
     }, (err) => {
-      console.warn('Real-time users subscription error:', err);
+      console.error('[DEBUG LOG - USERS SUBSCRIPTION ERROR] Real-time users subscription error:', err);
     });
   } catch (err) {
-    console.warn('Failed to setup users snapshot listener:', err);
+    console.error('[DEBUG LOG - USERS SUBSCRIPTION CATCH] Exception in subscribeToUsersCollection:', err);
     return () => {};
   }
 };
