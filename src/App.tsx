@@ -11,6 +11,7 @@ import UserDashboard from './components/UserDashboard';
 import AdminPanel from './components/AdminPanel';
 import GlobalNavbar from './components/GlobalNavbar';
 import BiometricLockScreen from './components/BiometricLockScreen';
+import SplashScreen from './components/SplashScreen';
 import AboutUs from './components/AboutUs';
 import { RealEstateProject, Transaction, UserAccount, InvestmentRecord, ProfitClaimRecord, SecurityLog, SystemSettings, Inquiry } from './types';
 import { INITIAL_PROJECTS, INITIAL_USER, INITIAL_ADMIN, INITIAL_TRANSACTIONS, INITIAL_SECURITY_LOGS } from './data';
@@ -59,6 +60,7 @@ const safeSetLocalStorage = (key: string, value: string) => {
 };
 
 export default function App() {
+  const [showSplash, setShowSplash] = useState<boolean>(true);
   const [isFirebaseSynced, setIsFirebaseSynced] = useState<boolean>(false);
   const isInitialSyncRef = useRef(true);
 
@@ -1676,7 +1678,11 @@ export default function App() {
   }
 
   return (
-    <MobileShell currentTimeString={getSimulatedTimeString()}>
+    <>
+      {showSplash && (
+        <SplashScreen onFinish={() => setShowSplash(false)} />
+      )}
+      <MobileShell currentTimeString={getSimulatedTimeString()}>
       <GlobalNavbar 
         currentPage={currentPage}
         activeUser={activeUser}
@@ -1786,5 +1792,6 @@ export default function App() {
         />
       )}
     </MobileShell>
+    </>
   );
 }
