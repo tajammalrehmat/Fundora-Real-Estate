@@ -889,7 +889,7 @@ export default function App() {
       }
     };
     setActiveUser(updatedUser);
-    setUsersListState(prev => prev.map(u => u.email === updatedUser.email ? updatedUser : u));
+    setUsersListState(prev => prev.map(u => (u.id === updatedUser.id || (u.email && u.email.trim().toLowerCase() === updatedUser.email.trim().toLowerCase())) ? updatedUser : u));
     saveAndSyncUser(updatedUser);
     addSystemLog('Wallet_Verification', `Cryptographic wallets bound & verified for ${updatedUser.email}. TRC20: ${trc20.slice(0, 6)}...`, 'Secure');
   };
@@ -955,7 +955,7 @@ export default function App() {
     };
 
     setActiveUser(updatedUser);
-    setUsersListState(prev => prev.map(u => u.email === updatedUser.email ? updatedUser : u));
+    setUsersListState(prev => prev.map(u => (u.id === updatedUser.id || (u.email && u.email.trim().toLowerCase() === updatedUser.email.trim().toLowerCase())) ? updatedUser : u));
     saveAndSyncUser(updatedUser);
     setTransactionsList(prev => [newTx, ...prev]);
     saveTransactionToFirebase(newTx);
@@ -1023,7 +1023,7 @@ export default function App() {
 
     // Apply updates across lists and sync to Firestore
     setActiveUser(updatedUser);
-    setUsersListState(usersListState.map(u => u.email === updatedUser.email ? updatedUser : u));
+    setUsersListState(usersListState.map(u => (u.id === updatedUser.id || (u.email && u.email.trim().toLowerCase() === updatedUser.email.trim().toLowerCase())) ? updatedUser : u));
     saveAndSyncUser(updatedUser);
 
     setProjectsList(prev => prev.map(p => p.id === updatedProject.id ? updatedProject : p));

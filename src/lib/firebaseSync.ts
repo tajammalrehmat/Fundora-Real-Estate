@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { db, auth } from './firebase';
+import { db, auth, FIREBASE_DATABASE_ID, firebaseConfig } from './firebase';
 import { 
   collection, 
   doc, 
@@ -16,6 +16,14 @@ import {
   where,
   onSnapshot
 } from 'firebase/firestore';
+
+// Explicit Debug Logger for Firestore Reads/Writes as requested
+export const logFirestoreOp = (op: 'READ' | 'WRITE' | 'DELETE' | 'LISTEN', collectionName: string, docId: string, extra?: any) => {
+  console.log(
+    `[FIRESTORE ${op}] Collection: "${collectionName}" | DocID: "${docId}" | ProjectID: "${firebaseConfig.projectId}" | DatabaseID: "${FIREBASE_DATABASE_ID}" | Time: ${new Date().toISOString()}`,
+    extra !== undefined ? extra : ''
+  );
+};
 import { 
   INITIAL_PROJECTS, 
   INITIAL_USER, 
@@ -165,7 +173,7 @@ export const loadUsersFromFirebase = async (): Promise<UserAccount[] | null> => 
     for (const u of users) {
       if (!u) continue;
       const originalEmail = u.email || '';
-      const cleanEmail = originalEmail.trim();
+      const cleanEmail = originalEmail.trim().toLowerCase();
       let updatedUser = { 
         ...u, 
         email: cleanEmail,
@@ -176,15 +184,17 @@ export const loadUsersFromFirebase = async (): Promise<UserAccount[] | null> => 
         updatedUser = { ...updatedUser, email: 'fundora.one@gmail.com' };
       }
 
-      // If email/password was untrimmed, update Firestore document directly
-      if (updatedUser.email !== originalEmail || originalEmail !== originalEmail.trim()) {
+      // If email or password was untrimmed or contained uppercase characters, rewrite Firestore document to lowercase/normalized form
+      const needsEmailRewrite = Boolean(u.email && u.email !== updatedUser.email);
+      const needsPasswordRewrite = Boolean(u.password && u.password !== updatedUser.password);
+      if (needsEmailRewrite || needsPasswordRewrite) {
         try {
           await setDoc(doc(db, 'users', updatedUser.id), updatedUser);
         } catch (err) {
           console.warn('Error updating cleaned user doc in Firestore:', err);
         }
       }
-      if (updatedUser.email && updatedUser.email.trim().toLowerCase() !== 'no-reply@fundora.one') {
+      if (updatedUser.email && updatedUser.email !== 'no-reply@fundora.one') {
         cleanedUsers.push(updatedUser);
       }
     }
@@ -249,6 +259,7 @@ export const loadSecurityLogsFromFirebase = async (): Promise<SecurityLog[] | nu
 export const saveProjectToFirebase = async (proj: RealEstateProject) => {
   if (!isFirebaseEnabled()) return;
   try {
+    logFirestoreOp('WRITE', 'projects', proj.id, { name: proj.name });
     await setDoc(doc(db, 'projects', proj.id), proj);
   } catch (e) {
     console.error('Failed to save project to Firebase:', e);
@@ -258,13 +269,14 @@ export const saveProjectToFirebase = async (proj: RealEstateProject) => {
 export const saveUserToFirebase = async (user: UserAccount) => {
   if (!isFirebaseEnabled() || !user || !user.id) return;
   try {
-    const cleanEmail = user.email ? user.email.trim() : '';
+    const cleanEmail = user.email ? user.email.trim().toLowerCase() : '';
     const cleanUser: UserAccount = {
       ...user,
       email: cleanEmail,
       password: user.password ? user.password.trim() : user.password,
       name: user.name ? user.name.trim() : user.name
     };
+    logFirestoreOp('WRITE', 'users', cleanUser.id, { email: cleanUser.email, role: cleanUser.role });
     await setDoc(doc(db, 'users', cleanUser.id), cleanUser);
   } catch (e) {
     console.error('Failed to save user to Firebase:', e);
@@ -274,6 +286,7 @@ export const saveUserToFirebase = async (user: UserAccount) => {
 export const deleteUserFromFirebase = async (id: string) => {
   if (!isFirebaseEnabled()) return;
   try {
+    logFirestoreOp('DELETE', 'users', id);
     await deleteDoc(doc(db, 'users', id));
   } catch (e) {
     console.error('Failed to delete user from Firebase:', e);
@@ -283,6 +296,7 @@ export const deleteUserFromFirebase = async (id: string) => {
 export const deleteTransactionFromFirebase = async (id: string) => {
   if (!isFirebaseEnabled()) return;
   try {
+    logFirestoreOp('DELETE', 'transactions', id);
     await deleteDoc(doc(db, 'transactions', id));
   } catch (e) {
     console.error('Failed to delete transaction from Firebase:', e);
@@ -292,6 +306,7 @@ export const deleteTransactionFromFirebase = async (id: string) => {
 export const deleteInvestmentFromFirebase = async (id: string) => {
   if (!isFirebaseEnabled()) return;
   try {
+    logFirestoreOp('DELETE', 'investments', id);
     await deleteDoc(doc(db, 'investments', id));
   } catch (e) {
     console.error('Failed to delete investment from Firebase:', e);
@@ -301,6 +316,7 @@ export const deleteInvestmentFromFirebase = async (id: string) => {
 export const deleteClaimFromFirebase = async (id: string) => {
   if (!isFirebaseEnabled()) return;
   try {
+    logFirestoreOp('DELETE', 'claims', id);
     await deleteDoc(doc(db, 'claims', id));
   } catch (e) {
     console.error('Failed to delete claim from Firebase:', e);
@@ -310,6 +326,7 @@ export const deleteClaimFromFirebase = async (id: string) => {
 export const deleteSecurityLogFromFirebase = async (id: string) => {
   if (!isFirebaseEnabled()) return;
   try {
+    logFirestoreOp('DELETE', 'security_logs', id);
     await deleteDoc(doc(db, 'security_logs', id));
   } catch (e) {
     console.error('Failed to delete security log from Firebase:', e);
@@ -324,7 +341,7 @@ export const subscribeToUsersCollection = (callback: (users: UserAccount[]) => v
         const users = snapshot.docs.map(d => {
           const u = d.data() as UserAccount;
           if (!u || !u.email) return u;
-          let cleanEmail = u.email.trim();
+          let cleanEmail = u.email.trim().toLowerCase();
           if (u.id === 'user-admin' && (cleanEmail === 'admin@fundora.one' || cleanEmail === 'no-reply@fundora.one')) {
             cleanEmail = 'fundora.one@gmail.com';
           }
@@ -466,7 +483,12 @@ export const subscribeToSystemSettings = (callback: (settings: SystemSettings) =
 export const saveTransactionToFirebase = async (tx: Transaction) => {
   if (!isFirebaseEnabled()) return;
   try {
-    await setDoc(doc(db, 'transactions', tx.id), tx);
+    const cleanTx: Transaction = {
+      ...tx,
+      userEmail: tx.userEmail ? tx.userEmail.trim().toLowerCase() : ''
+    };
+    logFirestoreOp('WRITE', 'transactions', cleanTx.id, { type: cleanTx.type, amount: cleanTx.amount, userEmail: cleanTx.userEmail });
+    await setDoc(doc(db, 'transactions', cleanTx.id), cleanTx);
   } catch (e) {
     console.error('Failed to save transaction to Firebase:', e);
   }
@@ -475,7 +497,12 @@ export const saveTransactionToFirebase = async (tx: Transaction) => {
 export const saveInvestmentToFirebase = async (inv: InvestmentRecord) => {
   if (!isFirebaseEnabled()) return;
   try {
-    await setDoc(doc(db, 'investments', inv.id), inv);
+    const cleanInv: InvestmentRecord = {
+      ...inv,
+      userEmail: inv.userEmail ? inv.userEmail.trim().toLowerCase() : ''
+    };
+    logFirestoreOp('WRITE', 'investments', cleanInv.id, { projectName: cleanInv.projectName, shares: cleanInv.sharesPurchased });
+    await setDoc(doc(db, 'investments', cleanInv.id), cleanInv);
   } catch (e) {
     console.error('Failed to save investment to Firebase:', e);
   }
@@ -484,7 +511,12 @@ export const saveInvestmentToFirebase = async (inv: InvestmentRecord) => {
 export const saveClaimToFirebase = async (claim: ProfitClaimRecord) => {
   if (!isFirebaseEnabled()) return;
   try {
-    await setDoc(doc(db, 'claims', claim.id), claim);
+    const cleanClaim: ProfitClaimRecord = {
+      ...claim,
+      userEmail: claim.userEmail ? claim.userEmail.trim().toLowerCase() : ''
+    };
+    logFirestoreOp('WRITE', 'claims', cleanClaim.id, { amount: cleanClaim.amount, status: cleanClaim.status });
+    await setDoc(doc(db, 'claims', cleanClaim.id), cleanClaim);
   } catch (e) {
     console.error('Failed to save claim to Firebase:', e);
   }
@@ -493,6 +525,7 @@ export const saveClaimToFirebase = async (claim: ProfitClaimRecord) => {
 export const saveSecurityLogToFirebase = async (log: SecurityLog) => {
   if (!isFirebaseEnabled()) return;
   try {
+    logFirestoreOp('WRITE', 'security_logs', log.id, { eventType: log.eventType, status: log.status });
     await setDoc(doc(db, 'security_logs', log.id), log);
   } catch (e) {
     console.error('Failed to save security log to Firebase:', e);
@@ -503,6 +536,7 @@ export const saveSecurityLogToFirebase = async (log: SecurityLog) => {
 export const deleteProjectFromFirebase = async (id: string) => {
   if (!isFirebaseEnabled()) return;
   try {
+    logFirestoreOp('DELETE', 'projects', id);
     await deleteDoc(doc(db, 'projects', id));
   } catch (e) {
     console.error('Failed to delete project from Firebase:', e);
@@ -521,6 +555,7 @@ export const loadSystemSettingsFromFirebase = async (): Promise<SystemSettings |
 
   if (!isFirebaseEnabled()) return null;
   try {
+    logFirestoreOp('READ', 'system_settings', 'default');
     const docRef = doc(db, 'system_settings', 'default');
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
@@ -530,6 +565,7 @@ export const loadSystemSettingsFromFirebase = async (): Promise<SystemSettings |
       }
       return data;
     } else {
+      logFirestoreOp('WRITE', 'system_settings', 'default');
       await setDoc(docRef, defaultSettings);
       return defaultSettings;
     }
@@ -546,6 +582,7 @@ export const saveSystemSettingsToFirebase = async (settings: SystemSettings) => 
       ...settings,
       apiUrl: (settings.apiUrl && !settings.apiUrl.includes('fundora.one')) ? settings.apiUrl : 'https://ais-pre-hb5de275kkaohqffdp2qfz-614235734610.asia-southeast1.run.app'
     };
+    logFirestoreOp('WRITE', 'system_settings', 'default', cleanSettings);
     await setDoc(doc(db, 'system_settings', 'default'), cleanSettings);
   } catch (e) {
     console.error('Failed to save system settings to Firebase:', e);
@@ -555,6 +592,7 @@ export const saveSystemSettingsToFirebase = async (settings: SystemSettings) => 
 export const loadInquiriesFromFirebase = async (): Promise<Inquiry[] | null> => {
   if (!isFirebaseEnabled()) return null;
   try {
+    logFirestoreOp('READ', 'inquiries', 'ALL_DOCS');
     const snapshot = await getDocs(collection(db, 'inquiries'));
     if (snapshot.empty) return [];
     const inquiries = snapshot.docs.map(d => d.data() as Inquiry);
@@ -568,6 +606,7 @@ export const loadInquiriesFromFirebase = async (): Promise<Inquiry[] | null> => 
 export const saveInquiryToFirebase = async (inquiry: Inquiry) => {
   if (!isFirebaseEnabled()) return;
   try {
+    logFirestoreOp('WRITE', 'inquiries', inquiry.id, { name: inquiry.name, email: inquiry.email });
     await setDoc(doc(db, 'inquiries', inquiry.id), inquiry);
   } catch (e) {
     console.error('Failed to save inquiry to Firebase:', e);
@@ -577,6 +616,7 @@ export const saveInquiryToFirebase = async (inquiry: Inquiry) => {
 export const deleteInquiryFromFirebase = async (id: string) => {
   if (!isFirebaseEnabled()) return;
   try {
+    logFirestoreOp('DELETE', 'inquiries', id);
     await deleteDoc(doc(db, 'inquiries', id));
   } catch (e) {
     console.error('Failed to delete inquiry from Firebase:', e);

@@ -10,7 +10,7 @@ import { ShieldAlert, Mail, Lock, User, Key, UserCheck, AlertTriangle, Sparkles,
 import { sendOtpEmail, isEmailServiceConfigured } from '../lib/emailService';
 import { db } from '../lib/firebase';
 import { isFirebaseEnabled, saveUserToFirebase } from '../lib/firebaseSync';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, getDoc, doc } from 'firebase/firestore';
 
 const isProductionOrNative = (): boolean => {
   const isCapacitor = typeof window !== 'undefined' && (window as any).Capacitor && (
@@ -107,6 +107,7 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [mockVerificationSentTo, setMockVerificationSentTo] = useState('');
+  const [pendingUserId, setPendingUserId] = useState<string | null>(null);
   const [generatedOtp, setGeneratedOtp] = useState('');
   const [isSendingOtp, setIsSendingOtp] = useState(false);
   const [emailSendError, setEmailSendError] = useState<string | null>(null);
@@ -686,6 +687,7 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
             password: password || existingUser.password
           };
           
+          setPendingUserId(updatedPendingUser.id);
           if (onRegisterPending) {
             onRegisterPending(updatedPendingUser);
           }
@@ -753,6 +755,7 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
       registrationDate: new Date().toISOString().slice(0, 10)
     };
 
+    setPendingUserId(pendingUser.id);
     if (onRegisterPending) {
       onRegisterPending(pendingUser);
     }
@@ -807,14 +810,22 @@ export default function AuthPages({ initialScreen = 'login', onAuthSuccess, onNa
         const snap = await getDocs(q);
         if (!snap.empty) {
           pendingUser = snap.docs[0].data() as UserAccount;
+        } else if (pendingUserId) {
+          // Scalable lookup strategy: O(1) document lookup by pendingUserId
+          const userDocSnap = await getDoc(doc(db, 'users', pendingUserId));
+          if (userDocSnap.exists()) {
+            pendingUser = userDocSnap.data() as UserAccount;
+          }
         }
       } catch (err) {
         console.warn("[Verify] Could not query pending user in Firestore:", err);
       }
     }
 
+    const targetId = pendingUser ? pendingUser.id : (pendingUserId || `user-${Date.now()}`);
+
     const newUser: UserAccount = {
-      id: pendingUser ? pendingUser.id : `user-${Date.now()}`,
+      id: targetId,
       email: targetEmail || 'saved_investor@gmail.com',
       name: (pendingUser && pendingUser.name) ? pendingUser.name : (fullName || 'New Secure Investor'),
       role: 'user',
