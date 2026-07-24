@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import Tesseract from 'tesseract.js';
 import { NativeBiometric } from 'capacitor-native-biometric';
 import { getApiUrl, fetchWithFallback } from '../utils/api';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
@@ -44,6 +45,66 @@ interface UserDashboardProps {
   activeTab?: 'overview' | 'properties' | 'wallet' | 'ledger' | 'claim' | 'referrals' | 'profile';
   setActiveTab?: (tab: 'overview' | 'properties' | 'wallet' | 'ledger' | 'claim' | 'referrals' | 'profile') => void;
   systemSettings?: SystemSettings;
+}
+
+// Client-side regex & OCR parser helper for crypto payment receipts / deposit screenshots
+function parseReceiptText(text: string, fileName?: string) {
+  let txid = '';
+  let amount = 0;
+  let network: 'TRC20' | 'BEP20' = 'TRC20';
+
+  const fullContent = (text || '') + '\n' + (fileName || '');
+  if (!fullContent.trim()) return { txid, amount, network };
+
+  const cleanText = fullContent.replace(/\r\n/g, '\n');
+
+  // 1. Extract Amount (USDT / USD deposit amounts)
+  const amountMatches = [
+    /(?:amount|paid|deposit|total|sum|value|payment|received|transferred)[\s:]*[$]?\s*([0-9]+(?:\.[0-9]+)?)/i,
+    /([0-9]+(?:\.[0-9]+)?)\s*(?:USDT|USD)/i,
+    /[$]\s*([0-9]+(?:\.[0-9]+)?)/,
+    /\b([0-9]{1,6}(?:\.[0-9]{1,2})?)\b/
+  ];
+
+  for (const regex of amountMatches) {
+    const match = cleanText.match(regex);
+    if (match && match[1]) {
+      const val = parseFloat(match[1]);
+      if (!isNaN(val) && val >= 1 && val <= 1000000) {
+        amount = val;
+        break;
+      }
+    }
+  }
+
+  // 2. Extract TxID / Order ID / Ref No (e.g., Quotex Deposit ID 124119776, Binance TxID, etc.)
+  const txidMatches = [
+    /(?:txid|txhash|transaction\s*id|deposit\s*id|order\s*id|ref\s*no|reference|hash|order|deposit|id)[\s:#]*([a-zA-Z0-9_-]{6,64})/i,
+    /(0x[a-fA-F0-9]{40,64})/,
+    /(T[A-Za-z0-9]{33})/,
+    /\b(\d{8,18})\b/
+  ];
+
+  for (const regex of txidMatches) {
+    const match = cleanText.match(regex);
+    if (match && match[1]) {
+      const candidate = match[1].trim();
+      const upper = candidate.toUpperCase();
+      if (!['AMOUNT', 'SUCCESS', 'DEPOSIT', 'PAYMENT', 'QUOTEX', 'BINANCE', 'USDT', 'PENDING', 'COMPLETED', 'TRANSFER', 'TOTAL', 'USD', 'STATUS', 'DATE'].includes(upper)) {
+        txid = candidate;
+        break;
+      }
+    }
+  }
+
+  // 3. Network detection
+  if (/BEP20|BSC|BINANCE|0X/i.test(cleanText)) {
+    network = 'BEP20';
+  } else {
+    network = 'TRC20';
+  }
+
+  return { txid, amount, network };
 }
 
 // SafePropertyImage component to prevent subpixel scaling glitches and image flickering/disappearing on mobile
@@ -986,8 +1047,8 @@ export default function UserDashboard({
         const rawBase64 = reader.result as string;
         
         try {
-          // Downscale and compress the image to 800x800 JPEG with 0.8 quality to fit under 150KB for fast mobile uploads
-          const base64Data = await compressAndResizeImage(rawBase64, 800, 800);
+          // Downscale and compress the image to 1200x1200 JPEG with 0.85 quality for crisp text recognition
+          const base64Data = await compressAndResizeImage(rawBase64, 1200, 1200);
           console.log("[UserDashboard] Compressed receipt size: from", Math.round(rawBase64.length / 1024), "KB to", Math.round(base64Data.length / 1024), "KB");
 
           let resultData = null;
@@ -1033,7 +1094,7 @@ export default function UserDashboard({
             const isKeyValid = (key: string | undefined): boolean => {
               if (!key) return false;
               const clean = key.trim();
-              return clean.startsWith('AIzaSy') && clean.length > 20;
+              return clean.length > 10;
             };
 
             if (isKeyValid(clientApiKey)) {
@@ -1048,8 +1109,8 @@ export default function UserDashboard({
                 }
               }
 
-              // Try gemini-2.5-flash first, then gemini-1.5-flash
-              const modelsToTry = ["gemini-2.5-flash", "gemini-1.5-flash"];
+              // Try gemini-3.6-flash first, then gemini-flash-latest
+              const modelsToTry = ["gemini-3.6-flash", "gemini-flash-latest"];
               let lastDirectError = null;
 
               for (const modelName of modelsToTry) {
@@ -1131,20 +1192,44 @@ export default function UserDashboard({
             }
           }
 
+          // Local Tesseract OCR fallback if backend and direct Gemini failed or produced no result
+          if (!resultData) {
+            try {
+              console.log("[UserDashboard] Triggering local Tesseract.js client OCR scanner...");
+              const ocrRes = await Tesseract.recognize(base64Data, 'eng');
+              const extractedText = ocrRes?.data?.text || '';
+              console.log("[UserDashboard] Local OCR extracted text:", extractedText);
+
+              const parsedOcr = parseReceiptText(extractedText, file.name);
+              if (parsedOcr.amount > 0 || (parsedOcr.txid && parsedOcr.txid.length > 0)) {
+                resultData = parsedOcr;
+                scannedViaFallback = true;
+              }
+            } catch (ocrErr) {
+              console.warn("[UserDashboard] Local Tesseract OCR fallback failed:", ocrErr);
+              const filenameParsed = parseReceiptText('', file.name);
+              if (filenameParsed.amount > 0 || filenameParsed.txid) {
+                resultData = filenameParsed;
+                scannedViaFallback = true;
+              }
+            }
+          }
+
           // Store proof attachment name/data
           setDepositProofInput(file.name || 'receipt_screenshot.jpg');
 
           if (resultData) {
             let { txid, amount, network } = resultData;
             let matchMessage = "";
-            let extractedAny = false;
+            let hasAmount = false;
+            let hasTxid = false;
 
             // Handle TxID / Order ID extraction
             if (txid && typeof txid === 'string' && txid.trim().length > 0) {
               const cleanTxid = txid.trim();
               setDepositHashInput(cleanTxid);
               matchMessage += `TxID (${cleanTxid.length > 12 ? cleanTxid.slice(0, 12) + '...' : cleanTxid}) `;
-              extractedAny = true;
+              hasTxid = true;
             }
 
             // Handle Amount extraction
@@ -1161,7 +1246,7 @@ export default function UserDashboard({
             if (!isNaN(parsedAmount) && parsedAmount > 0) {
               setDepositAmount(parsedAmount);
               matchMessage += `Amount ($${parsedAmount} USDT) `;
-              extractedAny = true;
+              hasAmount = true;
             }
 
             // Handle Network extraction
@@ -1178,23 +1263,21 @@ export default function UserDashboard({
               setDepositNetwork('TRC20');
             }
 
-            if (extractedAny) {
+            if (hasAmount || hasTxid) {
               setIsReceiptAutoFetched(true);
-              const successText = scannedViaFallback 
-                ? `✨ Direct AI Auto-fetched: ${matchMessage}` 
-                : `✨ AI Auto-fetched: ${matchMessage}`;
+              const successText = `✓ Extracted: ${matchMessage.trim()}`;
               setScanSuccessMessage(successText);
               setScanErrorMessage(null);
               showStatus(successText, "success");
             } else {
-              setIsReceiptAutoFetched(true);
+              setIsReceiptAutoFetched(false);
               const uploadedText = `✓ Screenshot attached as payment proof. Please enter your TxID and Amount manually below.`;
               setScanSuccessMessage(uploadedText);
               setScanErrorMessage(null);
               showStatus(uploadedText, "info");
             }
           } else {
-            setIsReceiptAutoFetched(true);
+            setIsReceiptAutoFetched(false);
             const uploadedText = `✓ Screenshot attached as payment proof. Please enter your TxID and Amount manually below.`;
             setScanSuccessMessage(uploadedText);
             setScanErrorMessage(null);
@@ -1202,6 +1285,7 @@ export default function UserDashboard({
           }
         } catch (apiErr: any) {
           console.warn("API or AI error during receipt analysis:", apiErr);
+          setIsReceiptAutoFetched(false);
           const uploadedText = `✓ Screenshot attached as payment proof. Please enter your TxID and Amount manually below.`;
           setScanSuccessMessage(uploadedText);
           setScanErrorMessage(null);
@@ -3273,7 +3357,7 @@ ${activeViewDoc.project.description}`
                           Verify Extracted Details
                         </span>
                       </div>
-                      {Boolean(depositProofInput || isReceiptAutoFetched) && (
+                      {Boolean(isReceiptAutoFetched && (depositAmount > 0 || depositHashInput.trim().length > 0)) && (
                         <span className="text-[8.5px] font-mono font-bold bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 px-2.5 py-1 rounded-full uppercase tracking-wider flex items-center gap-1 shrink-0">
                           <Lock className="w-3 h-3 text-emerald-400" />
                           Auto-Locked
@@ -3291,7 +3375,9 @@ ${activeViewDoc.project.description}`
                       <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/25 rounded-xl text-emerald-300 text-[9.5px] font-sans flex items-center justify-between gap-2 animate-fadeIn">
                         <div className="flex items-center gap-2">
                           <Lock className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                          <span className="font-semibold text-[9px] leading-tight">Receipt attached. Manual data entry is restricted to match payment proof.</span>
+                          <span className="font-semibold text-[9px] leading-tight">
+                            Screenshot attached as payment proof.
+                          </span>
                         </div>
                         <button
                           type="button"
@@ -3327,9 +3413,9 @@ ${activeViewDoc.project.description}`
                             placeholder="Auto-fills from Receipt..."
                             value={depositAmount || ''}
                             onChange={(e) => setDepositAmount(Number(e.target.value))}
-                            readOnly={Boolean(depositProofInput || isReceiptAutoFetched)}
+                            readOnly={Boolean(depositAmount > 0 && isReceiptAutoFetched)}
                             className={`w-full bg-[#060819] border border-indigo-500/20 rounded-xl py-3 pl-7 pr-8 text-[10px] sm:text-xs placeholder:text-[10px] sm:placeholder:text-xs font-extrabold shadow-2xs transition-all ${
-                              Boolean(depositProofInput || isReceiptAutoFetched) 
+                              Boolean(depositAmount > 0 && isReceiptAutoFetched) 
                                 ? 'opacity-90 bg-[#090b20] border-emerald-500/40 text-emerald-300 cursor-not-allowed' 
                                 : 'text-indigo-200 focus:border-indigo-500'
                             }`}
@@ -3375,9 +3461,9 @@ ${activeViewDoc.project.description}`
                           value={depositHashInput}
                           onChange={(e) => setDepositHashInput(e.target.value)}
                           placeholder="Auto-fills from Receipt..."
-                          readOnly={Boolean(depositProofInput || isReceiptAutoFetched)}
+                          readOnly={Boolean(depositHashInput.trim().length > 0 && isReceiptAutoFetched)}
                           className={`w-full bg-[#060819]/60 border border-indigo-500/20 rounded-xl p-3 pr-10 text-[10px] sm:text-xs placeholder:text-[10px] sm:placeholder:text-xs font-mono shadow-2xs transition-all ${
-                            Boolean(depositProofInput || isReceiptAutoFetched) 
+                            Boolean(depositHashInput.trim().length > 0 && isReceiptAutoFetched) 
                               ? 'opacity-90 bg-[#090b20] border-emerald-500/40 text-emerald-300 cursor-not-allowed' 
                               : 'text-indigo-200 focus:border-indigo-500'
                           }`}
