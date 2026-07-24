@@ -1001,10 +1001,12 @@ export default function UserDashboard({
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
+                'x-gemini-key': clientApiKey || '',
               },
               body: JSON.stringify({
                 base64Data,
                 mimeType: 'image/jpeg', // Force jpeg due to canvas compression format
+                apiKey: clientApiKey,
               }),
             });
 
@@ -1017,7 +1019,8 @@ export default function UserDashboard({
                 }
               } catch (_) {}
               throw new Error(serverErrorMsg);
-            }            const result = await response.json();
+            }
+            const result = await response.json();
             if (result.success && result.data) {
               resultData = result.data;
             } else {
@@ -1069,7 +1072,7 @@ export default function UserDashboard({
                               }
                             },
                             {
-                              text: "Analyze this transaction receipt image. Find and extract the three fields: 'txid' (the transaction ID, transaction hash, or transfer ID), 'amount' (the sent USDT amount parsed strictly as a float number), and 'network' (the deposit blockchain network: TRC20 or BEP20 based on addresses or networks mentioned). You must return a valid JSON object matching this schema: { txid: string, amount: number, network: string }"
+                              text: "Analyze this transaction receipt or payment order screenshot image. Extract three exact fields: 'txid' (the transaction ID, Order ID, Deposit ID, transaction hash, or transfer ID), 'amount' (the numerical payment/deposit USDT or USD amount parsed strictly as a float number, e.g. 12 for 12 USDT), and 'network' (the deposit network: TRC20 or BEP20). Return JSON matching this schema: { txid: string, amount: number, network: string }"
                             }
                           ]
                         }
@@ -1081,11 +1084,11 @@ export default function UserDashboard({
                           properties: {
                             txid: {
                               type: "string",
-                              description: "The transaction hash, ID or TxID from the screenshot."
+                              description: "The transaction hash, Order ID, Deposit ID or TxID from the screenshot."
                             },
                             amount: {
                               type: "number",
-                              description: "The transfer amount parsed as a number."
+                              description: "The transfer/payment amount parsed strictly as a number."
                             },
                             network: {
                               type: "string",
@@ -1114,7 +1117,6 @@ export default function UserDashboard({
                   const textContent = directJson?.candidates?.[0]?.content?.parts?.[0]?.text;
                   if (textContent) {
                     resultData = JSON.parse(textContent.trim());
-                    // Success! Exit the loop
                     lastDirectError = null;
                     break;
                   } else {
@@ -1125,35 +1127,24 @@ export default function UserDashboard({
                   lastDirectError = err;
                 }
               }
-
-              if (lastDirectError && !resultData) {
-                // Generate high quality fallback data so auto-fill never breaks
-                resultData = {
-                  txid: "TX" + Math.random().toString(16).slice(2, 10) + Date.now().toString(16).slice(0, 8),
-                  amount: 100,
-                  network: "TRC20"
-                };
-              }
-            } else {
-              // High quality fallback auto-fetch data
-              resultData = {
-                txid: "TX" + Math.random().toString(16).slice(2, 10) + Date.now().toString(16).slice(0, 8),
-                amount: 100,
-                network: "TRC20"
-              };
             }
           }
 
           if (resultData) {
             let { txid, amount, network } = resultData;
-            
-            // Ensure txid is always filled
-            if (!txid || typeof txid !== 'string' || txid.trim().length === 0) {
-              txid = "TX" + Math.random().toString(16).slice(2, 10) + Date.now().toString(16).slice(0, 8);
+            let matchMessage = "";
+            let extractedAny = false;
+
+            // Handle TxID / Order ID extraction
+            if (txid && typeof txid === 'string' && txid.trim().length > 0) {
+              const cleanTxid = txid.trim();
+              setDepositHashInput(cleanTxid);
+              matchMessage += `TxID (${cleanTxid.length > 12 ? cleanTxid.slice(0, 12) + '...' : cleanTxid}) `;
+              extractedAny = true;
             }
 
-            // Ensure amount is always filled
-            let parsedAmount = 100;
+            // Handle Amount extraction
+            let parsedAmount = 0;
             if (amount !== undefined && amount !== null) {
               if (typeof amount === 'string') {
                 const cleaned = (amount as string).replace(/[^\d.]/g, '');
@@ -1162,24 +1153,17 @@ export default function UserDashboard({
                 parsedAmount = amount;
               }
             }
-            if (isNaN(parsedAmount) || parsedAmount <= 0) {
-              parsedAmount = 100;
+
+            if (!isNaN(parsedAmount) && parsedAmount > 0) {
+              setDepositAmount(parsedAmount);
+              matchMessage += `Amount ($${parsedAmount} USDT) `;
+              extractedAny = true;
             }
 
-            let matchMessage = "";
-
-            setDepositHashInput(txid.trim());
-            matchMessage += `TxID (${txid.trim().slice(0, 10)}...) `;
-
-            setDepositAmount(parsedAmount);
-            matchMessage += `Amount ($${parsedAmount} USDT) `;
-
+            // Handle Network extraction
             if (network) {
               const upperNetwork = String(network).toUpperCase();
-              if (upperNetwork.includes('TRC') || upperNetwork.includes('TRX') || upperNetwork.includes('TRON')) {
-                setDepositNetwork('TRC20');
-                matchMessage += `Network (TRC20) `;
-              } else if (upperNetwork.includes('BEP') || upperNetwork.includes('BSC') || upperNetwork.includes('BINANCE') || upperNetwork.includes('0X')) {
+              if (upperNetwork.includes('BEP') || upperNetwork.includes('BSC') || upperNetwork.includes('BINANCE') || upperNetwork.includes('0X')) {
                 setDepositNetwork('BEP20');
                 matchMessage += `Network (BEP20) `;
               } else {
@@ -1188,39 +1172,33 @@ export default function UserDashboard({
               }
             } else {
               setDepositNetwork('TRC20');
-              matchMessage += `Network (TRC20) `;
             }
 
-            const successText = scannedViaFallback 
-              ? `✨ Direct Auto-fetched: ${matchMessage}` 
-              : `✨ AI Auto-fetched: ${matchMessage}`;
-            setScanSuccessMessage(successText);
-            setScanErrorMessage(null);
-            showStatus(successText, "success");
+            if (extractedAny) {
+              const successText = scannedViaFallback 
+                ? `✨ Direct AI Auto-fetched: ${matchMessage}` 
+                : `✨ AI Auto-fetched: ${matchMessage}`;
+              setScanSuccessMessage(successText);
+              setScanErrorMessage(null);
+              showStatus(successText, "success");
+            } else {
+              const uploadedText = `✓ Screenshot attached as payment proof. Please enter your TxID and Amount manually below.`;
+              setScanSuccessMessage(uploadedText);
+              setScanErrorMessage(null);
+              showStatus(uploadedText, "info");
+            }
           } else {
-            const fallbackTxid = "TX" + Math.random().toString(16).slice(2, 10) + Date.now().toString(16).slice(0, 8);
-            const fallbackAmount = 100;
-            setDepositHashInput(fallbackTxid);
-            setDepositAmount(fallbackAmount);
-            setDepositNetwork('TRC20');
-
-            const uploadedText = `✨ Auto-fetched: TxID (${fallbackTxid.slice(0, 10)}...) Amount ($${fallbackAmount} USDT)`;
+            const uploadedText = `✓ Screenshot attached as payment proof. Please enter your TxID and Amount manually below.`;
             setScanSuccessMessage(uploadedText);
             setScanErrorMessage(null);
-            showStatus(uploadedText, "success");
+            showStatus(uploadedText, "info");
           }
         } catch (apiErr: any) {
           console.warn("API or AI error during receipt analysis:", apiErr);
-          const fallbackTxid = "TX" + Math.random().toString(16).slice(2, 10) + Date.now().toString(16).slice(0, 8);
-          const fallbackAmount = 100;
-          setDepositHashInput(fallbackTxid);
-          setDepositAmount(fallbackAmount);
-          setDepositNetwork('TRC20');
-
-          const uploadedText = `✨ Auto-fetched: TxID (${fallbackTxid.slice(0, 10)}...) Amount ($${fallbackAmount} USDT)`;
+          const uploadedText = `✓ Screenshot attached as payment proof. Please enter your TxID and Amount manually below.`;
           setScanSuccessMessage(uploadedText);
           setScanErrorMessage(null);
-          showStatus(uploadedText, "success");
+          showStatus(uploadedText, "info");
         } finally {
           setIsAnalyzingReceipt(false);
         }

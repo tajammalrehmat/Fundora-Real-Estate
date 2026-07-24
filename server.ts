@@ -171,9 +171,9 @@ If you didn't request this verification, simply ignore this email.
     }
   });
 
-  // API Route to analyze uploaded screenshot receipt using Gemini 3.5 Flash
+  // API Route to analyze uploaded screenshot receipt using Gemini 2.5 Flash
   app.post("/api/analyze-receipt", async (req, res) => {
-    const { base64Data, mimeType } = req.body;
+    const { base64Data, mimeType, apiKey: clientBodyKey } = req.body;
 
     if (!base64Data) {
       return res.status(400).json({
@@ -184,12 +184,12 @@ If you didn't request this verification, simply ignore this email.
 
     try {
       // 1. Initialize GoogleGenAI client (lazy initialization)
-      let apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.VITE_GEMINI_API_KEY;
+      const headerKey = req.headers['x-gemini-key'] as string;
+      let apiKey = clientBodyKey || headerKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.VITE_GEMINI_API_KEY;
       
       const isKeyValid = (key: string | undefined): boolean => {
         if (!key) return false;
         const clean = key.trim();
-        // A valid Google Cloud API Key always starts with 'AIzaSy' and is at least 20 chars long
         return clean.startsWith('AIzaSy') && clean.length > 20;
       };
 
@@ -198,21 +198,15 @@ If you didn't request this verification, simply ignore this email.
       }
 
       if (!apiKey) {
-        console.warn("GEMINI_API_KEY environment variable is not set or is an invalid placeholder. Using simulated receipt analyzer logic.");
-        return res.json({
-          success: true,
-          simulated: true,
-          data: {
-            txid: "TX" + Math.random().toString(16).slice(2, 10) + Date.now().toString(16) + "e880bc",
-            amount: 150,
-            network: "TRC20"
-          },
-          warning: "No GEMINI_API_KEY detected in environment variables. Returning simulated receipt data."
+        console.warn("[Receipt Analyzer] No valid GEMINI_API_KEY detected in env or request.");
+        return res.status(400).json({
+          success: false,
+          error: "No valid Gemini API Key available for receipt OCR parsing."
         });
       }
 
       const ai = new GoogleGenAI({
-        apiKey: apiKey,
+        apiKey: apiKey.trim(),
         httpOptions: {
           headers: {
             'User-Agent': 'aistudio-build',
@@ -222,7 +216,7 @@ If you didn't request this verification, simply ignore this email.
 
       // 2. Extract clean base64 data and mimeType if nested in data URI
       let cleanBase64 = base64Data;
-      let detectedMimeType = mimeType || "image/png";
+      let detectedMimeType = mimeType || "image/jpeg";
 
       if (base64Data.startsWith("data:")) {
         const parts = base64Data.split(";base64,");
@@ -232,7 +226,7 @@ If you didn't request this verification, simply ignore this email.
         }
       }
 
-      console.log(`[Receipt Analyzer] Triggering Gemini 3.6 Flash for receipt parsing, size: ~${Math.round(cleanBase64.length / 1024)} KB, mime: ${detectedMimeType}...`);
+      console.log(`[Receipt Analyzer] Triggering Gemini 2.5 Flash for receipt parsing, size: ~${Math.round(cleanBase64.length / 1024)} KB, mime: ${detectedMimeType}...`);
 
       // 3. Formulate the multimodal parts for Gemini
       const imagePart = {
@@ -243,10 +237,10 @@ If you didn't request this verification, simply ignore this email.
       };
 
       const promptPart = {
-        text: "You are an expert AI payment auditor. Carefully analyze this image of a cryptocurrency payment receipt, deposit confirmation, transfer invoice, or order screenshot (e.g. Quotex, Binance, OKX, Bybit, Trust Wallet, MetaMask, Bitnbox, KuCoin, etc.).\n\n" +
-              "Identify and extract these EXACT fields:\n" +
-              "1. 'amount': The exact numerical transfer, deposit, or payment amount in USDT or USD. Look for labels like 'Total amount', 'Amount', 'Net Amount', 'Transferred', 'Paid', 'Payment', 'Total', 'Sum', 'Value'. Look at all numbers near 'USDT', 'USD', '$', or payment amount labels. For example, if the screenshot shows '12 USDT' or 'Total amount 12 USDT', return 12. Only return the clean pure number as a float/integer, without currency symbols or text.\n" +
-              "2. 'txid': The transaction hash, transaction ID, Order ID, Deposit ID, Ref No, or Reference Code (e.g., '124119776', 'TX...', '0x...'). Look for labels like 'Order ID', 'Deposit ID', 'TxID', 'TxHash', 'Transaction ID', 'Ref No', 'Reference Number', 'Hash', 'ID'. Extract the clean string without prefixes or labels.\n" +
+        text: "You are an expert AI payment auditor. Carefully analyze this image of a cryptocurrency payment receipt, deposit confirmation, transfer invoice, or order screenshot (such as Quotex, Binance, OKX, Bybit, Trust Wallet, MetaMask, Bitnbox, KuCoin, etc.).\n\n" +
+              "Identify and extract these EXACT fields from the screenshot:\n" +
+              "1. 'amount': The exact numerical transfer, deposit, or payment amount in USDT or USD. Look for labels like 'Total amount', 'Amount', 'Net Amount', 'Transferred', 'Paid', 'Payment', 'Total', 'Sum', 'Value'. Look at all numbers next to 'USDT', 'USD', '$', or payment amount labels (e.g. if the screenshot shows '12 USDT' or 'Total amount 12 USDT', return 12). Only return the clean pure number as a float/integer, without currency symbols or text.\n" +
+              "2. 'txid': The transaction hash, transaction ID, Order ID, Deposit ID, Ref No, or Reference Code (e.g. '124119776', 'TX...', '0x...'). Look for labels like 'Order ID', 'Deposit ID', 'Quotex Deposit ID', 'TxID', 'TxHash', 'Transaction ID', 'Ref No', 'Reference Number', 'Hash', 'ID'. Extract the clean ID string without prefixes or labels.\n" +
               "3. 'network': The matching transfer network (e.g. 'TRC20', 'BEP20', 'BSC', 'TRX'). Default to 'TRC20' if not specified.\n\n" +
               "Format the output STRICTLY as JSON matching the schema.",
       };
@@ -254,7 +248,7 @@ If you didn't request this verification, simply ignore this email.
       let response;
       try {
         response = await ai.models.generateContent({
-          model: "gemini-3.6-flash",
+          model: "gemini-2.5-flash",
           contents: { parts: [imagePart, promptPart] },
           config: {
             responseMimeType: "application/json",
@@ -279,9 +273,9 @@ If you didn't request this verification, simply ignore this email.
           }
         });
       } catch (primaryErr: any) {
-        console.warn("[Receipt Analyzer] gemini-3.6-flash call failed, trying gemini-3.1-pro-preview fallback:", primaryErr?.message || primaryErr);
+        console.warn("[Receipt Analyzer] gemini-2.5-flash call failed, trying gemini-1.5-flash fallback:", primaryErr?.message || primaryErr);
         response = await ai.models.generateContent({
-          model: "gemini-3.1-pro-preview",
+          model: "gemini-1.5-flash",
           contents: { parts: [imagePart, promptPart] },
           config: {
             responseMimeType: "application/json",
@@ -322,17 +316,10 @@ If you didn't request this verification, simply ignore this email.
       });
 
     } catch (error: any) {
-      console.error("[Receipt Analyzer] Error parsing receipt screenshot, falling back to simulation:", error);
-      // Graceful fallback to simulated data to prevent blocking user testing and flows
-      return res.json({
-        success: true,
-        simulated: true,
-        data: {
-          txid: "TX" + Math.random().toString(16).slice(2, 10) + Date.now().toString(16) + "e880bc",
-          amount: 150,
-          network: "TRC20"
-        },
-        warning: `Gemini AI is temporarily unavailable (${error.message || "Unknown error"}). Used high-quality mock extraction.`
+      console.error("[Receipt Analyzer] Error parsing receipt screenshot:", error);
+      return res.status(500).json({
+        success: false,
+        error: error.message || "Failed to parse receipt screenshot with AI."
       });
     }
   });
