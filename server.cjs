@@ -188,16 +188,8 @@ If you didn't request this verification, simply ignore this email.
     }
     try {
       const headerKey = req.headers["x-gemini-key"];
-      let apiKey = clientBodyKey || headerKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.VITE_GEMINI_API_KEY;
-      const isKeyValid = (key) => {
-        if (!key) return false;
-        const clean = key.trim();
-        return clean.startsWith("AIzaSy") && clean.length > 20;
-      };
-      if (!isKeyValid(apiKey)) {
-        apiKey = void 0;
-      }
-      if (!apiKey) {
+      let apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || clientBodyKey || headerKey || process.env.VITE_GEMINI_API_KEY;
+      if (!apiKey || typeof apiKey !== "string" || apiKey.trim().length === 0) {
         console.warn("[Receipt Analyzer] No valid GEMINI_API_KEY detected in env or request.");
         return res.status(400).json({
           success: false,
@@ -221,7 +213,7 @@ If you didn't request this verification, simply ignore this email.
           cleanBase64 = parts[1];
         }
       }
-      console.log(`[Receipt Analyzer] Triggering Gemini 2.5 Flash for receipt parsing, size: ~${Math.round(cleanBase64.length / 1024)} KB, mime: ${detectedMimeType}...`);
+      console.log(`[Receipt Analyzer] Triggering Gemini 3.6 Flash for receipt parsing, size: ~${Math.round(cleanBase64.length / 1024)} KB, mime: ${detectedMimeType}...`);
       const imagePart = {
         inlineData: {
           mimeType: detectedMimeType,
@@ -234,7 +226,7 @@ If you didn't request this verification, simply ignore this email.
       let response;
       try {
         response = await ai.models.generateContent({
-          model: "gemini-2.5-flash",
+          model: "gemini-3.6-flash",
           contents: { parts: [imagePart, promptPart] },
           config: {
             responseMimeType: "application/json",
@@ -259,9 +251,9 @@ If you didn't request this verification, simply ignore this email.
           }
         });
       } catch (primaryErr) {
-        console.warn("[Receipt Analyzer] gemini-2.5-flash call failed, trying gemini-1.5-flash fallback:", primaryErr?.message || primaryErr);
+        console.warn("[Receipt Analyzer] gemini-3.6-flash call failed, trying gemini-flash-latest fallback:", primaryErr?.message || primaryErr);
         response = await ai.models.generateContent({
-          model: "gemini-1.5-flash",
+          model: "gemini-flash-latest",
           contents: { parts: [imagePart, promptPart] },
           config: {
             responseMimeType: "application/json",
