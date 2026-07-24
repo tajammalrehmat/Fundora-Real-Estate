@@ -158,6 +158,7 @@ export default function UserDashboard({
   const [depositNetwork, setDepositNetwork] = useState<'TRC20' | 'BEP20'>('TRC20');
   const [depositHashInput, setDepositHashInput] = useState('');
   const [depositProofInput, setDepositProofInput] = useState(''); // Text representation / simulated file
+  const [isReceiptAutoFetched, setIsReceiptAutoFetched] = useState(false);
   const [depositSuccessMsg, setDepositSuccessMsg] = useState('');
   const [isAnalyzingReceipt, setIsAnalyzingReceipt] = useState(false);
   const [scanErrorMessage, setScanErrorMessage] = useState<string | null>(null);
@@ -1072,7 +1073,7 @@ export default function UserDashboard({
                               }
                             },
                             {
-                              text: "Analyze this transaction receipt or payment order screenshot image. Extract three exact fields: 'txid' (the transaction ID, Order ID, Deposit ID, transaction hash, or transfer ID), 'amount' (the numerical payment/deposit USDT or USD amount parsed strictly as a float number, e.g. 12 for 12 USDT), and 'network' (the deposit network: TRC20 or BEP20). Return JSON matching this schema: { txid: string, amount: number, network: string }"
+                              text: "Analyze this transaction receipt or payment order screenshot image. Extract three exact fields: 'txid' (the transaction ID, Order ID, Deposit ID, transaction hash, or transfer ID), 'amount' (the DEPOSIT, PAYMENT, or TRANSFER amount in USDT or USD, e.g. 12 for 12 USDT. CRITICAL: DO NOT return user account balances, available balances, wallet balances, or fee amounts! Strictly select the actual transfer/deposit payment amount), and 'network' (the deposit network: TRC20 or BEP20). Return JSON matching this schema: { txid: string, amount: number, network: string }"
                             }
                           ]
                         }
@@ -1130,6 +1131,9 @@ export default function UserDashboard({
             }
           }
 
+          // Store proof attachment name/data
+          setDepositProofInput(file.name || 'receipt_screenshot.jpg');
+
           if (resultData) {
             let { txid, amount, network } = resultData;
             let matchMessage = "";
@@ -1175,6 +1179,7 @@ export default function UserDashboard({
             }
 
             if (extractedAny) {
+              setIsReceiptAutoFetched(true);
               const successText = scannedViaFallback 
                 ? `✨ Direct AI Auto-fetched: ${matchMessage}` 
                 : `✨ AI Auto-fetched: ${matchMessage}`;
@@ -1182,12 +1187,14 @@ export default function UserDashboard({
               setScanErrorMessage(null);
               showStatus(successText, "success");
             } else {
+              setIsReceiptAutoFetched(true);
               const uploadedText = `✓ Screenshot attached as payment proof. Please enter your TxID and Amount manually below.`;
               setScanSuccessMessage(uploadedText);
               setScanErrorMessage(null);
               showStatus(uploadedText, "info");
             }
           } else {
+            setIsReceiptAutoFetched(true);
             const uploadedText = `✓ Screenshot attached as payment proof. Please enter your TxID and Amount manually below.`;
             setScanSuccessMessage(uploadedText);
             setScanErrorMessage(null);
@@ -3259,17 +3266,51 @@ ${activeViewDoc.project.description}`
 
                   {/* STEP 3: CONFIRM EXTRACTED DETAILS & VERIFY */}
                   <div className="bg-[#11132e]/50 border border-indigo-500/15 rounded-2xl p-4 sm:p-5 space-y-3.5 shadow-2xs">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] bg-indigo-600 text-white font-extrabold w-5 h-5 rounded-md flex items-center justify-center shrink-0">3</span>
-                      <span className="text-[10px] sm:text-[11px] text-slate-100 font-extrabold uppercase tracking-wider block font-sans leading-tight">
-                        Verify Extracted Details
-                      </span>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] bg-indigo-600 text-white font-extrabold w-5 h-5 rounded-md flex items-center justify-center shrink-0">3</span>
+                        <span className="text-[10px] sm:text-[11px] text-slate-100 font-extrabold uppercase tracking-wider block font-sans leading-tight">
+                          Verify Extracted Details
+                        </span>
+                      </div>
+                      {Boolean(depositProofInput || isReceiptAutoFetched) && (
+                        <span className="text-[8.5px] font-mono font-bold bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 px-2.5 py-1 rounded-full uppercase tracking-wider flex items-center gap-1 shrink-0">
+                          <Lock className="w-3 h-3 text-emerald-400" />
+                          Auto-Locked
+                        </span>
+                      )}
                     </div>
 
                     {/* Step 3 description */}
                     <p className="text-[8.5px] text-indigo-300 font-sans leading-relaxed">
                       Confirm the values below extracted from your uploaded receipt. Audit approval relies strictly on matching transaction evidence.
                     </p>
+
+                    {/* Lock Status & Clear Button Banner */}
+                    {Boolean(depositProofInput || isReceiptAutoFetched) && (
+                      <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/25 rounded-xl text-emerald-300 text-[9.5px] font-sans flex items-center justify-between gap-2 animate-fadeIn">
+                        <div className="flex items-center gap-2">
+                          <Lock className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                          <span className="font-semibold text-[9px] leading-tight">Receipt attached. Manual data entry is restricted to match payment proof.</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDepositProofInput('');
+                            setDepositAmount(0);
+                            setDepositHashInput('');
+                            setIsReceiptAutoFetched(false);
+                            setScanSuccessMessage(null);
+                            setScanErrorMessage(null);
+                            if (fileInputRef.current) fileInputRef.current.value = '';
+                            showStatus("Receipt screenshot cleared. Inputs unlocked.", "info");
+                          }}
+                          className="text-[8px] bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 px-2 py-1 rounded font-bold uppercase shrink-0 cursor-pointer transition-all"
+                        >
+                          Clear Image
+                        </button>
+                      </div>
+                    )}
 
                     {/* Amount & Shares Row */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
@@ -3286,7 +3327,12 @@ ${activeViewDoc.project.description}`
                             placeholder="Auto-fills from Receipt..."
                             value={depositAmount || ''}
                             onChange={(e) => setDepositAmount(Number(e.target.value))}
-                            className="w-full bg-[#060819] border border-indigo-500/20 rounded-xl py-3 pl-7 pr-8 text-[10px] sm:text-xs placeholder:text-[10px] sm:placeholder:text-xs text-indigo-200 font-extrabold shadow-2xs"
+                            readOnly={Boolean(depositProofInput || isReceiptAutoFetched)}
+                            className={`w-full bg-[#060819] border border-indigo-500/20 rounded-xl py-3 pl-7 pr-8 text-[10px] sm:text-xs placeholder:text-[10px] sm:placeholder:text-xs font-extrabold shadow-2xs transition-all ${
+                              Boolean(depositProofInput || isReceiptAutoFetched) 
+                                ? 'opacity-90 bg-[#090b20] border-emerald-500/40 text-emerald-300 cursor-not-allowed' 
+                                : 'text-indigo-200 focus:border-indigo-500'
+                            }`}
                           />
                         </div>
                       </div>
@@ -3329,7 +3375,12 @@ ${activeViewDoc.project.description}`
                           value={depositHashInput}
                           onChange={(e) => setDepositHashInput(e.target.value)}
                           placeholder="Auto-fills from Receipt..."
-                          className="w-full bg-[#060819]/60 border border-indigo-500/20 rounded-xl p-3 pr-10 text-[10px] sm:text-xs placeholder:text-[10px] sm:placeholder:text-xs text-indigo-200 font-mono shadow-2xs"
+                          readOnly={Boolean(depositProofInput || isReceiptAutoFetched)}
+                          className={`w-full bg-[#060819]/60 border border-indigo-500/20 rounded-xl p-3 pr-10 text-[10px] sm:text-xs placeholder:text-[10px] sm:placeholder:text-xs font-mono shadow-2xs transition-all ${
+                            Boolean(depositProofInput || isReceiptAutoFetched) 
+                              ? 'opacity-90 bg-[#090b20] border-emerald-500/40 text-emerald-300 cursor-not-allowed' 
+                              : 'text-indigo-200 focus:border-indigo-500'
+                          }`}
                         />
                       </div>
                     </div>
